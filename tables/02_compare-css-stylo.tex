@@ -1,0 +1,20 @@
+\begin{table}[!ht]
+    \centering
+    \small
+    \caption{Porównanie tradycyjnych silników CSS i Stylo (Quantum CSS)}
+    \label{tab:stylo}
+    \begin{tblr}{%
+        hlines,%
+        vlines,%
+        row{1}={font=\bfseries},%
+        column{1}={halign=c},%
+        column{2}={halign=c},%
+        column{3}={halign=c},%
+    }%
+        Cecha             & Gecko (C++)                  & Stylo (Rust)                     \\
+        Przebieg stylowania & Sekwencyjny                  & Równoległy                        \\
+        Bezpieczeństwo      & Manualne zarządzanie pamięcią & Automatyczne (Rust)               \\
+        Wydajność           & 1x                            & Do 18$\times$ na wielordzeniowych CPU \\
+        Kompatybilność      & Wszystkie przeglądarki        & Tylko Firefox/Servo               \\
+    \end{tblr}
+\end{table}

@@ -1,0 +1,215 @@
+\chapter{Istniejące rozwiązania}
+% You can label chapter to refer to it later in the text, e.g. in the
+% later chapter.
+\label{chpt:istniejące-rozwiązania}
+
+W niniejszym rozdziale przedstawiono kilka przykładowych rozwiązań wykorzystywanych w procesach migracji kodu źródłowego z języka C++ do języka Rust, ze szczególnym uwzględnieniem narzędzi automatyzujących ten proces oraz doświadczeń z projektów open source, takich jak te rozwijane przez fundację Mozilla.
+
+\section{Narzędzia do automatycznej konwersji C++ na Rust}
+
+W procesie migracji kodu z C++ do Rust wykorzystywane są narzędzia wspomagające automatyzację, choć pełna konwersja nadal wymaga ręcznego dostosowania ze względu na różnice semantyczne między językami. Przykładowe narzędzia to:
+
+\begin{itemize}
+    \item C2Rust framework umożliwiający translację kodu C (i częściowo C++) do Rust, wykorzystujący Clang do parsowania kodu źródłowego. Narzędzie generuje niskopoziomowy kod, który wymaga późniejszej refaktoryzacji (np. wprowadzenia bezpiecznych abstrakcji). \cite{c2rustmanual}
+    \item Bindgen narzędzie rozwijane przez Mozilla, automatycznie generujące powiązania (ang. bindings) kodu Rust do C/C++. \cite{bindgen}
+    \item Corrode eksperymentalny translator C do Rust.\cite{corrode}
+\end{itemize}
+
+Tłumacz (lub transpiler) generuje niebezpieczny kod w języku Rust, który ściśle odwzorowuje wejściowy kod w języku C. Głównym celem tłumacza jest wygenerowanie kodu funkcjonalnie identycznego z kodem źródłowym w C. Celem tego narzędzia nie jest generowanie bezpiecznego lub idiomatycznego kodu. Najlepszym podejściem dla programisty jest stopniowe przekształcanie przetłumaczonego kodu w języku Rust przy użyciu dedykowanych narzędzi do refaktoryzacji.
+
+Praca z tymi narzędziami może przebiegać w następujący sposób: 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/c2rust-overview.png}
+\caption{Proces tłumaczenia i przekształcania kodu C na idiomatyczny kod w języku Rust(przygotowano na podstawie\cite{c2rustmanual})}
+\label{fig:c2rust-overview}
+\end{figure}
+
+\section{Projekty open source migrujące z C++ do Rust}
+
+\begin{itemize}
+    \item Firefox (Mozilla) - stopniowa migracja komponentów (np. silnik CSS Stylo), z wykorzystaniem Rust do poprawy bezpieczeństwa pamięci. Mozilla opracowała też RLBox, narzędzie do sandboxowania niebezpiecznego kodu C++.\cite{quantumstylo}
+
+    \item Servo - eksperymentalna przeglądarka napisana całkowicie w Rust, której fragmenty (np. WebRender) zostały zintegrowane z Firefoxem.\cite{servo}
+
+    \item Deno - (JavaScript lub TypeScript runtime) – używa Rust dla wydajnych modułów, podczas gdy core jest w C++.\cite{deno}
+
+    \item Linux Kernel - od wersji 6.1 wspiera Rust jako drugi język systemowy, co umożliwia migrację wybranych modułów.\cite{linuxkernel}
+
+\end{itemize}
+
+Projekty te pokazują, że migracja często odbywa się modularnie, z zachowaniem interoperacyjności przez Foreign Function Interface(FFI).
+
+\section{Migracja komponentu Stylo (CSS engine) z C++ do Rust w projekcie Firefox}
+
+Przeglądarka Firefox, rozwijana przez fundację Mozilla, od wielu lat stanowi jedno z głównych środowisk testowych i produkcyjnych dla języka Rust. W ramach projektu \textit{Quantum} zainicjowano serię modernizacji komponentów Firefox, której celem było poprawienie wydajności i bezpieczeństwa. Jednym z najbardziej znaczących efektów tej inicjatywy była migracja silnika CSS, znanego jako \textit{Stylo}, z języka C++ do Rust. To przedsięwzięcie stanowi wzorcowy przypadek efektywnej migracji komponentu systemowego o wysokim stopniu złożoności.
+
+\subsection{Projekt Stylo}
+
+Silnik CSS odpowiada za przetwarzanie stylów arkuszy i ich stosowanie do drzewa DOM (Document Object Model) w czasie renderowania strony. Poprzedni silnik (\textit{Gecko}), napisany w C++, miał ograniczoną możliwość wydajnej równoległości i był narażony na typowe problemy z zarządzaniem pamięcią. Rust, jako język systemowy bezpieczny pamięciowo, oferował realną szansę na poprawę niezawodności i skalowalności komponentu CSS\cite{stylo}.
+
+Migracja Stylo została poprzedzona fazą eksperymentalną w ramach projektu Servo — nowej przeglądarki pisanej od podstaw w Rust. Na podstawie rezultatów z Servo, komponent \textit{WebStylo} został przekształcony i zaadaptowany do Firefox jako \textit{Stylo}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/chromevsmozilla.png}
+\caption{Architektura Chrome w porównaniu do Firefox (na podstawie Firefox 57 "Quantum")}
+\label{fig:chromevsmozilla}
+\end{figure}
+
+Klasyczna architektura wieloprocesowa (Chrome):
+\begin{itemize}
+    \item Wyspecjalizowane procesy: oddzielne dla każdej karty (tab), rozszerzeń (extensions) i GPU,
+    \item Izolacja przez nadmiar: każda karta = nowy proces (wysokie zużycie RAM),
+    \item Hierarchia kontrolna: proces główny (browser) zarządza procesami potomnymi.
+\end{itemize}
+
+Podejście Quantum:
+\begin{itemize}
+    \item Hybrydowy model procesów:
+    \begin{itemize}
+        \item jeden główny proces zarządzający (Parent),
+        \item procesy treści (Content) współdzielone między kartami,
+        \item dedykowane procesy dla krytycznych komponentów (GPU, Network),
+    \end{itemize}
+    \item Optymalizacja zasobów:
+    \begin{itemize}
+        \item współdzielenie pamięci dla podobnych stron,
+        \item dynamiczne alokowanie procesów wg potrzeb,
+    \end{itemize}
+    \item Modułowość: wymienne komponenty i lepsza skalowalność.
+\end{itemize}
+
+Kluczowe komponenty nowej architektury:
+\begin{itemize}
+    \item \textbf{Quantum Flow}
+    \begin{itemize}
+        \item Priorytetyzacja zadań: System kolejek oparty o krytyczność operacji
+        \item Pipeline renderingu: Równoległe przetwarzanie etapów wyświetlania strony
+        \item Przeplot wątków: Wykorzystanie wszystkich rdzeni CPU
+    \end{itemize}
+    \item \textbf{Quantum CSS}
+    \begin{itemize}
+        \item Równoległe drzewo stylów: Podział pracy na niezależne fragmenty
+        \item Cache współdzielony: Jedna kopia stylów dla identycznych elementów
+        \item Inkrementalne aktualizacje: Minimalizacja przeróbek przy dynamicznych zmianach
+    \end{itemize}
+    \item \textbf{Quantum Render (WebRender)}
+    \begin{itemize}
+        \item Kompozytowanie na GPU: Traktowanie strony jako sceny 3D
+        \item Listy wyświetleń: Optymalizacja przekazywania danych do karty graficznej
+        \item Wektorowy pipeline: Bezstratne skalowanie elementów UI
+    \end{itemize}
+\end{itemize}
+
+\subsection{Przebieg migracji i integracja Stylo z Firefox}
+
+Stylo został zaprojektowany jako komponent kompatybilny z istniejącym systemem budowania Firefoksa. Umożliwiło to tzw. \textit{dual compilation} -- kompilowanie części przeglądarki w Rust, a pozostałych w C++. Komunikacja między językami odbywa się poprzez FFI (Foreign Function Interface), co wymagało stworzenia bezpiecznych interfejsów i utrzymania zgodności ABI.
+
+Migracja przebiegała etapami, zaczynając od funkcji odpowiedzialnych za selekcję stylów, a następnie przekształcając kolejne moduły\cite{stylowiki}. Każdy etap podlegał intensywnemu testowaniu, zarówno funkcjonalnemu, jak i porównawczemu z poprzednią implementacją C++. Wprowadzenie Rust pozwoliło na równoległe przetwarzanie drzew stylów, co znacząco poprawiło wydajność renderowania.
+
+\subsection{Rezultaty i znaczenie projektu Stylo}
+
+Migracja silnika Stylo do Rust przyniosła korzyści:
+\begin{itemize}
+    \item \textbf{Wydajność:} znaczący wzrost wydajności przeglądarki, szczególnie w obszarach dotyczących równoległego stylowania złożonych drzew DOM,
+    \item \textbf{Bezpieczeństwo:} redukcja błędów pamięci typowych dla C++,
+    \item \textbf{Inspiracja:} projekt stał się wzorem dla dalszych migracji komponentów Firefoksa.
+\end{itemize}
+
+Stylo jest wyłącznym rozwiązaniem Mozilla, rozwijanym tylko dla przeglądarek Servo i Firefox. Od wersji Firefox 57 (Quantum) zastąpił tradycyjny silnik Gecko CSS, wykorzystując architekturę zapoczątkowaną w projekcie Servo. Stylo działa jako hybrydowy silnik - w Firefox wykorzystuje zarówno komponenty Rust (Servo) jak i C++ (Gecko), podczas gdy w Servo istnieje jako czyste rozwiązanie w Rust.
+
+\input{tables/02_compare-css-stylo.tex}
+
+\begin{itemize}
+    \item 80\% redukcji błędów bezpieczeństwa pamięci
+    \item 2-4× szybsze stylowanie stron
+    \item 30\% mniejsze zużycie RAM przy złożonych stylach
+\end{itemize}
+
+Projekt Stylo dowodzi, że migracja nawet bardzo złożonych komponentów systemowych jest możliwa i opłacalna, pod warunkiem dobrej integracji narzędzi, testów oraz wsparcia ze strony zespołu inżynierów. Stylo pozostaje jednym z flagowych przypadków użycia Rust w produkcyjnym środowisku i fundamentem sukcesu projektu Quantum.
+
+\subsection{Sukces rynkowy Firefox Quantum}
+
+Wprowadzenie silnika Stylo w Firefox 57 (\textit{Quantum}) w listopadzie 2017 roku stanowiło punkt zwrotny dla przeglądarki Mozilli:
+\begin{itemize}
+    \item Firefox odzyskał 15\% użytkowników w ciągu 6 miesięcy od premiery,
+    \item powstało ponad 100 nowych rozszerzeń stworzonych specjalnie dla Quantum,
+    \item nagroda \textit{WebAward} dla najszybszej przeglądarki 2018.
+\end{itemize}
+
+\subsection{Wnioski projektu Stylo}
+
+Przykład migracji Stylo pokazuje, że sukces transformacji kodu do Rust zależy nie tylko od możliwości technicznych, ale również od przyjętej strategii organizacyjnej i zdolności utrzymania kompatybilności z istniejącą bazą kodu. Mozilla, jako pionier wykorzystania Rust w praktyce, wyznaczyła kierunek rozwoju dla innych organizacji poszukujących nowoczesnych metod poprawy jakości oprogramowania systemowego.
+
+\section{Eksperymentalna przeglądarka Servo}
+
+Servo to eksperymentalna przeglądarka internetowa rozwijana przez fundację Mozilla, napisana całkowicie w języku Rust. Głównym celem projektu było stworzenie nowoczesnego silnika przeglądarkowego, który wykorzystuje zalety Rust do poprawy wydajności i niezawodności. Servo stał się poligonem doświadczalnym dla wielu innowacyjnych rozwiązań, które później zintegrowano z Firefoxem\cite{servo}.
+
+\subsection{Architektura i kluczowe komponenty Servo}
+
+Servo został zaprojektowany z myślą o modularności i równoległym przetwarzaniu. Jego architektura obejmuje:
+\begin{itemize}
+    \item Silnik renderowania \textit{WebRender}: wykorzystuje GPU do komponowania stron, traktując je jako sceny 3D,
+    \item Silnik stylów \textit{Stylo}: równoległe przetwarzanie CSS, które później zostało włączone do Firefoxa,
+    \item Parser HTML i DOM: zoptymalizowany pod kątem bezpieczeństwa i wydajności,
+    \item Wsparcie dla WebAssembly: umożliwia wykonywanie wysokowydajnego kodu w przeglądarce.
+\end{itemize}
+
+\subsection{Przebieg rozwoju i integracja Servo z Firefoxem}
+
+Projekt Servo rozpoczął się w 2012 roku jako eksperyment mający na celu przetestowanie możliwości Rust w kontekście przeglądarki. W miarę rozwoju kluczowe komponenty Servo, takie jak \textit{WebRender} i \textit{Stylo}, zostały zintegrowane z Firefoxem w ramach projektu \textit{Quantum}. Dzięki temu Firefox zyskał nowoczesne funkcje, zachowując jednocześnie kompatybilność z istniejącym kodem C++\cite{quantumstylo}.
+
+\subsection{Rezultaty i znaczenie projektu Servo}
+
+Servo przyniósł następujące korzyści:
+\begin{itemize}
+    \item \textbf{Wydajność:} zastosowanie równoległego przetwarzania znacznie przyspieszyło renderowanie stron,
+    \item \textbf{Bezpieczeństwo:} brak błędów pamięciowych (typowych dla C++),
+    \item \textbf{Innowacje:} Servo stał się inspiracją dla innych projektów wykorzystujących Rust (np. Deno).
+\end{itemize}
+
+\subsection{Wnioski Servo}
+
+Projekt Servo pokazał, że Rust nadaje się do budowy złożonych systemów, takich jak przeglądarki internetowe. Jego modularność i interoperacyjność z C++ umożliwiły stopniowe wdrażanie nowych rozwiązań w istniejących projektach, co jest kluczowe dla dużych organizacji.
+
+\section{Środowisko wykonawcze Deno dla JavaScript, TypeScript i WebAssembly}
+
+Deno to nowoczesne środowisko wykonawcze dla JavaScript, TypeScript i WebAssembly\cite{deno}. Deno zostało napisane w Rust, co zapewnia mu wysoką wydajność i bezpieczeństwo. Głównym celem projektu było rozwiązanie problemów Node.js, takich jak złożony system zarządzania zależnościami i brak wsparcia dla TypeScript out-of-the-box.
+
+\subsection{Architektura i kluczowe komponenty Deno}
+
+Deno opiera się na następujących komponentach:
+\begin{itemize}
+    \item Rust jako podstawa: większość funkcji systemowych jest zaimplementowana w Rust,
+    \item Modułowy system bezpieczeństwa: Deno domyślnie uruchamia kod w sandboxie, co minimalizuje ryzyko zagrożeń,
+    \item Wsparcie dla WebAssembly: umożliwia wykonywanie kodu napisanego w innych językach,
+    \item Silnik V8: ten sam silnik JavaScript używany w Chrome i Node.js.
+\end{itemize}
+
+Deno wykorzystuje język Rust do implementacji niskopoziomowych funkcji, takich jak operacje wejścia/wyjścia (I/O) czy zarządzanie procesami. Komunikacja między JavaScriptem a Rust odbywa się za pośrednictwem interfejsu Foreign Function Interface (FFI), co umożliwia zachowanie wysokiej wydajności przy jednoczesnym zapewnieniu bezpieczeństwa.
+
+\subsection{Rezultaty i znaczenie projektu Deno}
+
+Deno przyniósł następujące korzyści:
+\begin{itemize}
+    \item \textbf{Wydajność:} dzięki Rust Deno osiąga lepszą wydajność niż Node.js (w niektórych zadaniach),
+    \item \textbf{Bezpieczeństwo:} sandboxing i domyślne ograniczenia minimalizują ryzyko ataków,
+    \item \textbf{Nowoczesne funkcje:} wsparcie dla TypeScript i WebAssembly out-of-the-box.
+\end{itemize}
+
+\subsection{Wnioski Deno}
+
+Deno jest przykładem udanego połączenia JavaScript i Rust, pokazując, że migracja wybranych komponentów do Rust może przynieść znaczące korzyści w zakresie wydajności i bezpieczeństwa.
+
+\section{Inicjatywy Mozilla wspierające migrację}
+
+Mozilla, jako jeden z głównych fundatorów rozwoju Rust, prowadzi projekty ułatwiające przejście z C++:
+\begin{itemize}
+    \item \textbf{Oxidization} – wewnętrzny program Mozilla mający na celu identyfikację komponentów Firefox, których migracja do Rust przyniesie największe korzyści bezpieczeństwa\cite{oxidation},
+    \item \textbf{CXX} – biblioteka do bezpiecznej interoperacyjności C++ i Rust, minimalizująca ryzyko błędów na styku języków\cite{cxx},
+    \item \textbf{Rust-C++ dual compilation} – wsparcie w build systemie Firefox dla mieszanych projektów\cite{rustinfirefox}.
+\end{itemize}
+
+Działania te pokazują, że migracja w dużych projektach wymaga nie tylko narzędzi, ale też wsparcia organizacyjnego i rozwoju oprogramowania.
