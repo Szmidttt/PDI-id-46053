@@ -11,22 +11,42 @@ Podczas wyboru fragmentu kodu kierowaliśmy się kilkoma kluczowymi kryteriami:
         \item \textbf{Wykonalność i modularność:} Fragment kodu musiał być na tyle odizolowany, aby jego migracja nie pociągała za sobą konieczności przepisywania znacznych części przeglądarki. Biblioteka o jasno zdefiniowanym API i konkretnym zadaniu ułatwia proces zastępowania implementacji bez naruszania reszty systemu.
         \item \textbf{Zgodność ze strategicznymi celami Fundacji Mozilla:} Wybrany komponent powinien wpisywać się w długofalową strategię Mozilli polegającą na stopniowym zwiększaniu ilości kodu napisanego w Rust w celu poprawy bezpieczeństwa i wydajności przeglądarki. Zgodnie z incjatywą "Oxidation". \cite{oxidation}
     \end{itemize}
-Na podstawie tych cech do migracji została wybrana wewnętrzna biblioteka testcrasher.dll. Na decyzję dodatkowo wpłyną fakt istnienia w systemie śledzenia błędów Mozilli zadania o numerze Bug 1798688\cite{bug1798688}, które jawnie definiuje cel jako "Replace breakpad with rust-minidump in the testcrasher library" \footnote{Zastąpienie breakpad przez rust-minidump w blibliotece testcrasher}.
+Na podstawie tych cech do migracji została wybrana wewnętrzna biblioteka testcrasher.dll. Na decyzję dodatkowo wpłynął fakt istnienia w systemie śledzenia błędów Mozilli zadania o numerze Bug 1798688\cite{bug1798688}, które jawnie definiuje cel jako "Replace breakpad with rust-minidump in the testcrasher library" \footnote{Zastąpienie breakpad przez rust-minidump w blibliotece testcrasher}.
 
 \section{Analiza biblioteki testcrasher}
 \subsection{Cel biblioteki testcrasher}
-Biblioteka dynamiczna testcrasher jest używana jako tester działania komponentu crashreporter w Mozilla Firefox.
+Biblioteka dynamiczna testcrasher jest narzędziem deweloperskim które używane jest jako tester działania komponentu crashreporter w Mozilla Firefox.
+Działa poprzez wywoływanie awarii procesu a następnie analizę pliku zrzutu pamięci (.dmp) który został wytworzony przez moduł Crashreporter.
 Jej działanie skupia się na dwóch obszarach:
 \begin{itemize}
-    \item \textbf{Analiza zrzutu pamięci:} Za tą część odpowiada plik dumputils.cpp.
-    \item \textbf{Wywoływanie awarii procesu:} Za tą część odpowiada plik nsTestCrasher.cpp. 
+    \item \textbf{Analiza zrzutu pamięci:} Za tą część odpowiada plik dumputils.cpp. API tej części zawiera:
+    \begin{itemize}
+        \item \textbf{DumpHasStream()} - Zwraca wartość \texttt{true}, jeśli dany zrzut pamięci zawiera strumień określonego typu. 
+        \item \textbf{DumpHasInstructionPointerMemory()} - Zwraca wartość \texttt{true}, jeśli dany zrzut pamięci zawiera region pamięci który zawiera wskaźnik instrukcji z rekordu wyjąktu.
+        \item \textbf{DumpCheckMemory()} - Sprawdza, czy zrzut pamięci zawiera region rozpoczynający się pod adresem określonym w pliku \texttt{crash-addr} w bieżącym katalogu roboczym. Region ten musi mieć długość 32 bajtów i zawierać wartości od 0 do 31 w porządku rosnącym.
+    \end{itemize}
+    \item \textbf{Wywoływanie awarii procesu:} Za tą część odpowiada plik nsTestCrasher.cpp. API tej części zawiera:
+    \begin{itemize}
+        \item \textbf{Crash()}
+        \item \textbf{EnablePHC()}
+        \item \textbf{GetWin64CFITestFnAddrOffset()}
+        \item \textbf{TryOverrideExceptionHandler()}
+        \item \textbf{SaveAppMemory()}
+    \end{itemize}
 \end{itemize}
 \subsection{Architektura biblioteki testcrasher przed migracją}
-
+Rdzeniem biblioteki dynamicznej testcrasher są dwa pliki źródłowe C++: dumputils.cpp i nsTestCrasher.cpp.
+Moduł dumputils.cpp  wykorzystuje do swojego działania zewnętrzną bibliotekę Google Breakpad. Jest to projekt open-source napisany w C++, dostarczający API do obsługi plików minidump. Jednym z głównych zadań tej pracy jest pozbycie się tej zależności.
+\\
+Kod źródłowy biblioteki korzysta w niewielkim stopniu z kluczowych mechanizmów i konwencji specyficznych dla bazy kodu Firefoksa. Powoduje to że migracja kodu z Języka C++ na Język Rust nie będzie wiązać się z przepisywaniem/modyfikacjami kodu poza biblioteką testcrasher.
+\\
+System budowania Mozilli, w przypadku biblioteki testcrasher stosuje metodę gdzie pliki .cpp są łączone w jedną jednostkę kompilacji w celu przyspieszenia procesu. Następnie skompilowany kod obiektowy jest linkowany w ostateczną bibliotekę dynamiczną testcrasher.dll.
+\\
+Głównym sposobem użycia biblioteki sa zautomatyzowane testy, najczęściej pisane w JavaScripcie i uruchamiane w specjalnym frameworku testowym Mozilli(xpcshell-test). Skrypt testowy wywołuje wyeksportowaną funkcję z testcrasher.dll w celu spowodowania awarii i sprawdzenia czy moduł Crash Reporter wygenerował poprawny plik zrzutu pamięci.
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.8\linewidth]{figures/testcrasher.png}
-\caption{architektura biblioteki testcrasher}
+\caption{Architektura biblioteki testcrasher}
 \label{fig:testcrasher-architecture}
 \end{figure}
 
@@ -36,14 +56,24 @@ Przyjęta strategia migracji opiera się na stopniowym i iteracyjnym zastępowan
 Fundamentalnym założeniem jest, że z perspektywy klienta biblioteki, którym w tym przypadku są skrypty testujące, proces migracji jest całkowicie transparentny. Wymaga to utrzymania stabilnego interfejsu binarnego aplikacji (ABI) zgodnego z językiem C. Dzięki temu poszczególne funkcje, a docelowo całe moduły zaimplementowane w C++, mogą być zastępowane ich odpowiednikami w Rust, a następnie weryfikowane za pomocą istniejącego zestawu testów.
 Proces migracji został zaplanowany w następujących, logicznie następujących po sobie etapach:
 \begin{enumerate}
-    \item \textbf{Konfiguracja hybrydowego procesu budowania:} Pierwszym krokiem jest modyfikacja systemu budowania Mozilli (moz.build) w celu umożliwienia współistnienia kodu C++ i Rust. Polega to na zdefiniowaniu reguł kompilacji dla nowego kodu Rust do postaci biblioteki statycznej (rust\_testcrasher.lib). Następnie, ta biblioteka statyczna jest dołączana do finalnej biblioteki dynamicznej (testcrasher.dll), a jej publiczne symbole są eksportowane w taki sposób, aby zachować zgodność z oryginalnym API.
-    \item \textbf{Iteracyjna migracja logiki analitycznej (dumputils.cpp):} Proces właściwej migracji rozpoczyna się od komponentów analitycznych. Poszczególne funkcje odpowiedzialne za parsowanie i analizę plików minidump są reimplementowane w języku Rust, wykorzystując do tego celu bibliotekę `rust-minidump`. Po zaimplementowaniu każdej funkcji w Rust, jej oryginalna wersja w C++ jest usuwana, a nowa implementacja zostaje zintegrowana w procesie budowania.
-    \item \textbf{Migracja logiki inicjującej awarie (nsTestCrasher.cpp):} Po pomyślnej weryfikacji poprawności działania modułu analitycznego, analogiczny proces jest stosowany do kodu odpowiedzialnego za inicjowanie stanów awaryjnych. Funkcje C++ są zastępowane przez ich odpowiedniki w Rust, które wykorzystują bibliotekę `sadness-generator`.
-    \item \textbf{Finalizacja i czyszczenie konfiguracji:} Po zakończeniu migracji całości kodu funkcjonalnego do języka Rust, oryginalne pliki źródłowe C++ (`dumputils.cpp` oraz `nsTestCrasher.cpp`) są ostatecznie usuwane z drzewa projektu. Konfiguracja w pliku `moz.build` jest upraszczana, eliminując reguły dotyczące kompilacji C++ dla tej biblioteki.
+    \item \textbf{Konfiguracja procesu budowania:} Pierwszym krokiem jest modyfikacja systemu budowania Mozilli (moz.build) w celu umożliwienia współistnienia kodu C++ i Rust. Polega to na zdefiniowaniu reguł kompilacji dla nowego kodu Rust do postaci biblioteki statycznej (rust\_testcrasher.lib). Następnie, ta biblioteka statyczna jest dołączana do finalnej biblioteki dynamicznej (testcrasher.dll), a jej publiczne symbole są eksportowane w taki sposób, aby zachować zgodność z oryginalnym API.
+    \item \textbf{Iteracyjna migracja logiki analitycznej (dumputils.cpp):} Proces właściwej migracji rozpoczyna się od komponentów analitycznych. Poszczególne funkcje odpowiedzialne za parsowanie i analizę plików minidump są reimplementowane w języku Rust, wykorzystując do tego celu crate rust-minidump. Po zaimplementowaniu każdej funkcji w Rust, jej oryginalna wersja w C++ jest usuwana, a nowa implementacja zostaje zintegrowana w procesie budowania.
+    \item \textbf{Migracja logiki inicjującej awarie (nsTestCrasher.cpp):} Po pomyślnej weryfikacji poprawności działania modułu analitycznego, analogiczny proces jest stosowany do kodu odpowiedzialnego za inicjowanie stanów awaryjnych. Funkcje C++ są zastępowane przez ich odpowiedniki w Rust, które wykorzystują bibliotekę sadness-generator.
+    \item \textbf{Finalizacja i czyszczenie konfiguracji:} Po zakończeniu migracji całości kodu funkcjonalnego do języka Rust, oryginalne pliki źródłowe C++ (dumputils.cpp oraz nsTestCrasher.cpp) są ostatecznie usuwane z drzewa projektu. Konfiguracja w pliku moz.build jest upraszczana, eliminując reguły dotyczące kompilacji C++ dla tej biblioteki.
 \end{enumerate}
 Dzięki takiemu podejściu, w dowolnym momencie procesu migracji biblioteka pozostaje w pełni funkcjonalna, zawierając mieszankę działającego kodu C++ i Rust.
+
 \subsection{Wykorzytane narzędzia i technologie}
 Do przeprowadzenia migracji wybranego fragmentu kodu użyto:
 \begin{itemize}
+    \item \textbf{Biblioteki Rust(Crate):}
+    \begin{itemize}
+        \item \textbf{rust-minidump:} Kolekcja bibliotek służąca do odczytu i analizy plików zrzutu pamięci, modelowana na podstawie Google Breakpad\cite{rust-minidump}. W celu przeprowadzenia migracji użyta została biblioteka minidump-processor.
+        \item \textbf{sadness-generator:} Biblioteka służąca do intencjonalnego wywoływania awarii procesu na różne sposoby, przykładowo stackoverflow.
+    \end{itemize}
     \item 
 \end{itemize}
+\subsection{System budowania Mozilla Firefox}
+\section{Migracja części odpowiedzialnej za anlizę zrzutów pamięci}
+\section{Migracja fragmentu odpowiedzialnego za wywoływanie awarii procesu}
+\section{Architektura biblioteki testcrasher po migracji}
