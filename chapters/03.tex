@@ -73,8 +73,34 @@ Do przeprowadzenia migracji wybranego fragmentu kodu użyto:
         \item \textbf{sadness-generator:} Biblioteka służąca do intencjonalnego wywoływania awarii procesu na różne sposoby, przykładowo stackoverflow.
     \end{itemize}
 \end{itemize}
-\subsection{System budowania Mozilla Firefox}
 \section{Migracja części odpowiedzialnej za anlizę zrzutów pamięci}
+Proces migracji komponentu odpowiedzialnego za analizę zrzutów pamięci, zaimplementowanego pierwotnie w pliku dumputils.cpp, rozpoczęto od przygotowania środowiska deweloperskiego. Celem było umożliwienie kompilacji kodu Rust i jego integracji z istniejącą, opartą na C++, strukturą biblioteki testcrasher.
+\subsection{Przygotowanie środowiska}
+Integracja nowego kodu w języku Rust z rozbudowanym ekosystemem przeglądarki Firefox wymagała przeprowadzenia kilku operacji konfiguracyjnych w systemie budowania.
+\\
+Pierwszym krokiem było zdefiniowanie nowego crate - podstawowej jednostki kompilacji i dystrybucji w ekosystemie Rust. W tym crate docelowo miała znaleźć się cała nowa implementacja funkcjonalności biblioteki testcrasher.
+\\
+Następnie, nowo utworzony crate musiał zostać włączony do głównego "workspace" projektu Firefox. Workspace w kontekście narzędzia Cargo (menedżera pakietów Rust) to zbiór crate'ów, które są zarządzane i kompilowane wspólnie. Dodanie testcrasher do tej struktury formalnie uczyniło go częścią przeglądarki.
+\\
+Kolejnym krokiem było zsynchronizowanie zależności dla całego projektu. Wykonano to za pomocą polecenia \texttt{cargo update -p workspace-hack}. Polecenie to aktualizuje plik Cargo.lock dla całego workspace, zapewniając spójność wersji wszystkich zależności i umożliwiając systemowi budowania poprawne przetwarzanie nowego komponentu.
+\\
+Ostatnim, etapem było zmodyfikowanie pliku konfiguracyjnego systemu budowania - moz.build w folderze testcrasher oraz dodanie nowego pliku moz.build w folderze zawierającym kod źródłowy Rust. Pliki moz.build, są skryptami w języku Python, jednak ich działanie jest określone poprzez specjalne zasady określone przez Mozille. Ich celem jest określienie funkcjonalności plików w folderze w którym się znajdują\cite{mozbuild}. W przypadku biblioteki testcrasher plik moz.build po modyfikacjach wyglądał następująco:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/mozbuild1-1.png}
+\caption{Zawartość pliku konfiguracyjnego moz.build budujący biblioteke testcrasher - etap 1 cz.1}
+\label{fig:mozbuild-1-1}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/mozbuild1-2.png}
+\caption{Zawartość pliku konfiguracyjnego moz.build budujący biblioteke testcrasher - etap 1 cz.2}
+\label{fig:mozbuild-1-2}
+\end{figure}
+Modyfikacje dokonane w pliku moz.build umożliwiają współistnienie kodu C++ oraz Rust w ramach finalnej biblioteki testcrasher.dll. Konfiguracja ta instruuje system budowania, aby dołączył rust\_testcrasher.lib - bibliotekę statyczną zawierającą skompilowany kod Rust do finalnej biblioteki testcrasher.dll.
+Szczegółowa lista zmian wraz z ich celem znajduje się w tabeli \ref{tab:mozbuild-1}.
+\input{tables/03_mozbuild-mods.tex}
 \section{Migracja fragmentu odpowiedzialnego za wywoływanie awarii procesu}
 \section{Architektura biblioteki testcrasher po migracji}
 

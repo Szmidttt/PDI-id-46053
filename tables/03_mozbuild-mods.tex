@@ -1,0 +1,20 @@
+\begin{table}[!ht]
+    \centering
+    \small
+    \caption{Opis zmian w pliku konfiguracyjntm moz.build budującym biblioteke testcrasher - etap 1}
+    \label{tab:mozbuild-1}
+    \begin{tblr}{%
+        hlines,%
+        vlines,%
+        row{1}={font=\bfseries},%
+        colspec={c Q[10cm,1]},
+    }%
+        Element & Cel zmiany\\
+        DIRS & Wskazanie lokalizacji statycznej biblioteki rust\_testcrasher\\
+        UNIFIED\_SOURCES & Usunięcie przemigrowanego dumputils.cpp oraz zależności od Google Breakpad \\
+        DEFFILE & Definiuje symbole eksportowane z biblioteki statycznej rust\_testcrasher\\
+        USE\_STATIC\_MSVCRT & Flaga użyta aby kod C++, jak i Rust używał tej samej, statycznej wersji biblioteki wykonawczej MSVC \\
+        USE\_LIBS &  Wskazanie linkerowi biblioteki statycznej rust\_testcrasher aby skompilowany kod z Rust został dodany do biblioteki finalnej testcrasher.dll \\
+        OS\_LIBS & Dodanie bibliotek systemowych potrzebnych bibliotece rust\_testcrasher\\
+    \end{tblr}
+\end{table}
