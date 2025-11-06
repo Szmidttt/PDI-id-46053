@@ -1,6 +1,6 @@
-
 \chapter{Migracja fragmentu kodu z języka programowania C++ na język Rust}
-\section{Wybór fragmetu kodu do migracji}
+Niniejszy rozdział szczegółowo opisuje proces migracji wybranego komponentu z języka programowania C++ na język Rust. Zgodnie z założeniami projektu, poszukiwania odpowiedniego fragmentu kodu ograniczono do oprogramowania rozwijanego przez Fundację Mozilla, co w praktyce skierowało uwagę na bazę kodu przeglądarki Firefox. Główną motywacją dla podjętych działań jest dążenie do poprawy bezpieczeństwa pamięci i ogólnej stabilności aplikacji, co jest jednym ze strategicznych celów wykorzystania języka Rust w dojrzałych projektach. W dalszej części rozdziału przedstawiono kolejne etapy pracy: począwszy od kryteriów, które zadecydowały o wyborze komponentu, przez jego szczegółową analizę, aż po opis przyjętej strategii migracji, wykorzystanych narzędzi i finalnego przebiegu implementacji.
+\section{Kryteria wyboru fragmetu kodu do migracji}
 Podczas wyboru fragmentu kodu kierowaliśmy się kilkoma kluczowymi kryteriami:
 \begin{itemize}
     \item \textbf{Wysoki potencjał poprawy bezpieczeństwa:}
@@ -11,11 +11,11 @@ Podczas wyboru fragmentu kodu kierowaliśmy się kilkoma kluczowymi kryteriami:
         \item \textbf{Wykonalność i modularność:} Fragment kodu musiał być na tyle odizolowany, aby jego migracja nie pociągała za sobą konieczności przepisywania znacznych części przeglądarki. Biblioteka o jasno zdefiniowanym API i konkretnym zadaniu ułatwia proces zastępowania implementacji bez naruszania reszty systemu.
         \item \textbf{Zgodność ze strategicznymi celami Fundacji Mozilla:} Wybrany komponent powinien wpisywać się w długofalową strategię Mozilli polegającą na stopniowym zwiększaniu ilości kodu napisanego w Rust w celu poprawy bezpieczeństwa i wydajności przeglądarki. Zgodnie z incjatywą "Oxidation". \cite{oxidation}
     \end{itemize}
-Na podstawie tych cech do migracji została wybrana wewnętrzna biblioteka testcrasher.dll. Na decyzję dodatkowo wpłynął fakt istnienia w systemie śledzenia błędów Mozilli zadania o numerze Bug 1798688\cite{bug1798688}, które jawnie definiuje cel jako "Replace breakpad with rust-minidump in the testcrasher library" \footnote{Zastąpienie breakpad przez rust-minidump w blibliotece testcrasher}.
-
-\section{Analiza biblioteki testcrasher}
+\section{Wybrany fragment kodu - biblioteka dynamiczna testcrasher}
+Pierwszym etapem prac było zidentyfikowanie w kodzie źródłowym należącym do fundacji Mozilla odpowiedniego kandydata do migracji, który spełniałby wcześniej zdefiniowane kryteria. W procesie tym wykorzystano dwa narzędzia. Pierwszym z nich był Searchfox, narzędzie które indeksuje kod źródłowy oraz umożliwia szybkie wyszukiwanie kodu i plików źródłowych. Drugim narzędziem była Bugzilla, system śledzenia zadań Mozilli, służący do zarządzania zgłoszeniami błędów, propozycjami zmian i zadaniami deweloperskimi.
+Przy użyciu tych narzędzi oraz na podstawie powyżej opisanych kryteriów do migracji została wybrana wewnętrzna biblioteka testcrasher.dll. Na decyzję dodatkowo wpłynął fakt istnienia w systemie śledzenia błędów Mozilli zadania o numerze Bug 1798688\cite{bug1798688}, które jawnie definiuje cel jako "Replace breakpad with rust-minidump in the testcrasher library" \footnote{Zastąpienie breakpad przez rust-minidump w blibliotece testcrasher}.
 \subsection{Cel biblioteki testcrasher}
-Biblioteka dynamiczna testcrasher jest narzędziem deweloperskim które używane jest jako tester działania komponentu crashreporter w Mozilla Firefox.
+Biblioteka dynamiczna testcrasher jest narzędziem deweloperskim które używane jest jako tester działania komponentu Crashreporter - wewnętrznego mechanizmu przeglądarki Firefox, odpowiedzialnego za zbieranie i raportowanie informacji o awariach aplikacji.
 Działa poprzez wywoływanie awarii procesu a następnie analizę pliku zrzutu pamięci (.dmp) który został wytworzony przez moduł Crashreporter.
 Jej działanie skupia się na dwóch obszarach:
 \begin{itemize}
@@ -46,11 +46,12 @@ Głównym sposobem użycia biblioteki sa zautomatyzowane testy, najczęściej pi
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.8\linewidth]{figures/testcrasher.png}
-\caption{Architektura biblioteki testcrasher}
+\caption{Architektura biblioteki testcrasher - opracowanie własne}
 \label{fig:testcrasher-architecture}
 \end{figure}
 
 \section{Strategia migracji i wykorzystane narzędzia}
+Kolejnym ważnym aspektem był dobór odpowiedniej strategii oraz narzędzi. W związku z tym kierowaliśmy się ?. 
 \subsection{Strategia migracji biblioteki testcrasher}
 Przyjęta strategia migracji opiera się na stopniowym i iteracyjnym zastępowaniu kodu C++ kodem Rust, przy jednoczesnym zachowaniu w pełni kompatybilnego publicznego API.
 Fundamentalnym założeniem jest, że z perspektywy klienta biblioteki, którym w tym przypadku są skrypty testujące, proces migracji jest całkowicie transparentny. Wymaga to utrzymania stabilnego interfejsu binarnego aplikacji (ABI) zgodnego z językiem C. Dzięki temu poszczególne funkcje, a docelowo całe moduły zaimplementowane w C++, mogą być zastępowane ich odpowiednikami w Rust, a następnie weryfikowane za pomocą istniejącego zestawu testów.
@@ -71,9 +72,9 @@ Do przeprowadzenia migracji wybranego fragmentu kodu użyto:
         \item \textbf{rust-minidump:} Kolekcja bibliotek służąca do odczytu i analizy plików zrzutu pamięci, modelowana na podstawie Google Breakpad\cite{rust-minidump}. W celu przeprowadzenia migracji użyta została biblioteka minidump-processor.
         \item \textbf{sadness-generator:} Biblioteka służąca do intencjonalnego wywoływania awarii procesu na różne sposoby, przykładowo stackoverflow.
     \end{itemize}
-    \item 
 \end{itemize}
 \subsection{System budowania Mozilla Firefox}
 \section{Migracja części odpowiedzialnej za anlizę zrzutów pamięci}
 \section{Migracja fragmentu odpowiedzialnego za wywoływanie awarii procesu}
 \section{Architektura biblioteki testcrasher po migracji}
+
