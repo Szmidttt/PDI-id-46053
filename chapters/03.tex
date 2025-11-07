@@ -51,10 +51,12 @@ Głównym sposobem użycia biblioteki sa zautomatyzowane testy, najczęściej pi
 \end{figure}
 
 \section{Strategia migracji i wykorzystane narzędzia}
-Kolejnym ważnym aspektem był dobór odpowiedniej strategii oraz narzędzi. W związku z tym kierowaliśmy się ?. 
+Po wyborze biblioteki testcrasher jako fragmentu kodu do migracji na język Rust kolejnym ważnym aspektem był dobór odpowiedniej strategii oraz narzędzi.
+Obrane podejście musiało uwzględniać specyfikę pracy z dużą bazę kodu jaką, jest projekt Mozilla Firefox. 
+Priorytetem stało się zatem zapewnienie bezpieczeństwa samego procesu migracji, zdefiniowanego jako brak regresji - istniejące i działające funkcjonalności nie zostaną uszkodzone przez wprowadzane zmiany podczas procesu migracji oraz zachowanie stabilności binarnej (ABI zgodne z językiem C). Aby to osiągnąć, każda nowo napisana w Rust funkcja była natychmiast integrowana i weryfikowana za pomocą istniejącego zestawu testów automatycznych, co gwarantowało jej pełną kompatybilność z resztą systemu.
 \subsection{Strategia migracji biblioteki testcrasher}
 Przyjęta strategia migracji opiera się na stopniowym i iteracyjnym zastępowaniu kodu C++ kodem Rust, przy jednoczesnym zachowaniu w pełni kompatybilnego publicznego API.
-Fundamentalnym założeniem jest, że z perspektywy klienta biblioteki, którym w tym przypadku są skrypty testujące, proces migracji jest całkowicie transparentny. Wymaga to utrzymania stabilnego interfejsu binarnego aplikacji (ABI) zgodnego z językiem C. Dzięki temu poszczególne funkcje, a docelowo całe moduły zaimplementowane w C++, mogą być zastępowane ich odpowiednikami w Rust, a następnie weryfikowane za pomocą istniejącego zestawu testów.
+Fundamentalnym założeniem jest, że z perspektywy klienta biblioteki, którym w tym przypadku są skrypty testujące, proces migracji jest całkowicie niewidoczny. Wymaga to utrzymania stabilnego interfejsu binarnego aplikacji (ABI) zgodnego z językiem C. Dzięki temu poszczególne funkcje, a docelowo całe moduły zaimplementowane w C++, mogą być zastępowane ich odpowiednikami w Rust, a następnie weryfikowane za pomocą istniejącego zestawu testów.
 Proces migracji został zaplanowany w następujących, logicznie następujących po sobie etapach:
 \begin{enumerate}
     \item \textbf{Konfiguracja procesu budowania:} Pierwszym krokiem jest modyfikacja systemu budowania Mozilli (moz.build) w celu umożliwienia współistnienia kodu C++ i Rust. Polega to na zdefiniowaniu reguł kompilacji dla nowego kodu Rust do postaci biblioteki statycznej (rust\_testcrasher.lib). Następnie, ta biblioteka statyczna jest dołączana do finalnej biblioteki dynamicznej (testcrasher.dll), a jej publiczne symbole są eksportowane w taki sposób, aby zachować zgodność z oryginalnym API.
