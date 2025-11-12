@@ -72,7 +72,6 @@ Do przeprowadzenia migracji wybranego fragmentu kodu użyto:
     \item \textbf{Biblioteki Rust(Crate):}
     \begin{itemize}
         \item \textbf{rust-minidump:} Kolekcja bibliotek służąca do odczytu i analizy plików zrzutu pamięci, modelowana na podstawie Google Breakpad\cite{rust-minidump}. W celu przeprowadzenia migracji użyta została biblioteka minidump-processor.
-        \item \textbf{sadness-generator:} Biblioteka służąca do intencjonalnego wywoływania awarii procesu na różne sposoby, przykładowo stackoverflow.
     \end{itemize}
 \end{itemize}
 \section{Migracja części odpowiedzialnej za anlizę zrzutów pamięci}
@@ -103,6 +102,20 @@ Ostatnim, etapem było zmodyfikowanie pliku konfiguracyjnego systemu budowania -
 Modyfikacje dokonane w pliku moz.build umożliwiają współistnienie kodu C++ oraz Rust w ramach finalnej biblioteki testcrasher.dll. Konfiguracja ta instruuje system budowania, aby dołączył rust\_testcrasher.lib - bibliotekę statyczną zawierającą skompilowany kod Rust do finalnej biblioteki testcrasher.dll.
 Szczegółowa lista zmian wraz z ich celem znajduje się w tabeli \ref{tab:mozbuild-1}.
 \input{tables/03_mozbuild-mods.tex}
+\subsection{Reimplemetacja części odpowiedzialnej za analizę w języku Rust}
 \section{Migracja fragmentu odpowiedzialnego za wywoływanie awarii procesu}
+Kolejny etap prac obejmował migrację fragmentu kodu którego zadaniem było wywoływanie awarii procesu, logika za to odpowiedzialna orginalnie była zaimplementowana z pliku nsTestCrasher.cpp.
+Ta część migracji w odróżnieniu od poprzedniej nie zakłada zastąpienia zależności napisanej w języku C++.
+Jako że środowisko budowania zostało już wcześniej przygotowane do obsługi kodu Rust, prace mogły skupić się wyłącznie na implementacji.
+\subsection{Architektura biblioteki testcrasher po migracji części odpowiedzialnej za analizę plików zrzutu pamięci}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/testcrasher2.png}
+\caption{Architektura biblioteki testcrasher po 2 etapie - opracowanie własne}
+\label{fig:testcrasher-architecture2}
+\end{figure}
+\subsection{Reimplemetacja części odpowiedzialnej za wywoływanie awarii procesu w języku Rust}
+\subsection{Architektura biblioteki testcrasher po migracji części odpowiedzialnej za wywoływanie awarii}
+
 \section{Architektura biblioteki testcrasher po migracji}
 
