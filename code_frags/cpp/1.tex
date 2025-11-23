@@ -1,0 +1,9 @@
+\begin{lstlisting}{language = C++}
+Minidump dump(dump_file);
+if (!dump.Read()) return false;
+
+MinidumpException* exception = minidump.GetException();
+if (!exception) {
+    return false;
+}
+\end{lstlisting}
