@@ -87,33 +87,52 @@ Kolejnym krokiem było zsynchronizowanie zależności dla całego projektu. Wyko
 \\
 Ostatnim, etapem było zmodyfikowanie pliku konfiguracyjnego systemu budowania - moz.build w folderze testcrasher oraz dodanie nowego pliku moz.build w folderze zawierającym kod źródłowy Rust. Pliki moz.build, są skryptami w języku Python, jednak ich działanie jest określone poprzez specjalne zasady określone przez Mozille. Ich celem jest określienie funkcjonalności plików w folderze w którym się znajdują\cite{mozbuild}. W przypadku biblioteki testcrasher plik moz.build po modyfikacjach wyglądał następująco:
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\linewidth]{figures/mozbuild1-1.png}
-\caption{Zawartość pliku konfiguracyjnego moz.build budujący biblioteke testcrasher - etap 1 cz.1}
-\label{fig:mozbuild-1-1}
-\end{figure}
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\linewidth]{figures/mozbuild1-2.png}
-\caption{Zawartość pliku konfiguracyjnego moz.build budujący biblioteke testcrasher - etap 1 cz.2}
-\label{fig:mozbuild-1-2}
-\end{figure}
+% \begin{figure}[H]
+% \centering
+% \includegraphics[width=0.8\linewidth]{figures/mozbuild1-1.png}
+% \caption{Zawartość pliku konfiguracyjnego moz.build budujący biblioteke testcrasher - etap 1 cz.1}
+% \label{fig:mozbuild-1-1}
+% \end{figure}
+% \begin{figure}[H]
+% \centering
+% \includegraphics[width=0.8\linewidth]{figures/mozbuild1-2.png}
+% \caption{Zawartość pliku konfiguracyjnego moz.build budujący biblioteke testcrasher - etap 1 cz.2}
+% \label{fig:mozbuild-1-2}
+% \end{figure}
+\input{code_frags/moz.build/1.tex}
 Modyfikacje dokonane w pliku moz.build umożliwiają współistnienie kodu C++ oraz Rust w ramach finalnej biblioteki testcrasher.dll. Konfiguracja ta instruuje system budowania, aby dołączył rust\_testcrasher.lib - bibliotekę statyczną zawierającą skompilowany kod Rust do finalnej biblioteki testcrasher.dll.
 Szczegółowa lista zmian wraz z ich celem znajduje się w tabeli \ref{tab:mozbuild-1}.
 \input{tables/03_mozbuild-mods.tex}
-\subsection{Reimplemetacja części odpowiedzialnej za analizę w języku Rust}
-Zgodnie z przyjętą strategią iteracyjnej migracji, opisaną w rozdziale 3.3.1, proces reimplementacji rozpoczął się od modułu odpowiedzialnego za analizę zrzutów pamięci (dumputils.cpp). Kluczowym celem tego etapu było zastąpienie zewnętrznej zależności C++ - biblioteki Google Breakpad jej nowoczesnym i bezpiecznym odpowiednikiem w ekosystemie Rust, czyli rust-minidump. Poniższa analiza przedstawia kluczowe zmiany w kodzie, pogrupowane w kategorie tematyczne, które bezpośrednio odnoszą się do celów pracy - poprawy bezpieczeństwa i nowoczesności kodu.
-\subsection{Zastąpienie zależności i nowy model obsługi błędów}
-\input{code_frags/style.tex}
-\input{code_frags/cpp/1.tex}
-\input{code_frags/rust/1.tex}
-
-\section{Migracja fragmentu odpowiedzialnego za wywoływanie awarii procesu}
-Kolejny etap prac obejmował migrację fragmentu kodu którego zadaniem było wywoływanie awarii procesu, logika za to odpowiedzialna orginalnie była zaimplementowana z pliku nsTestCrasher.cpp.
-Ta część migracji w odróżnieniu od poprzedniej nie zakłada zastąpienia zależności napisanej w języku C++.
-Jako że środowisko budowania zostało już wcześniej przygotowane do obsługi kodu Rust, prace mogły skupić się wyłącznie na implementacji.
-\subsection{Reimplemetacja części odpowiedzialnej za wywoływanie awarii procesu w języku Rust}
+\subsection{Omówienie migracji części odpowiedzialnej za analizę w języku Rust}
+W niniejszym podrozdziale przedstawiono i przeanalizowano kluczowe zmiany wynikające z migracji kodu z C++ na Rust. 
+\subsubsection{Zastąpienie zależności i nowy model obsługi błędów}
+\begin{itemize}
+    \item Kod w C++:
+    \input{code_frags/cpp/1.tex}
+    \item Kod w Rust:
+    \input{code_frags/rust/1.tex}
+\end{itemize}
+W wersji C++ funkcja dump.Read() zwraca wartość logiczną, a metody GetException() i GetMemoryList() zwracają surowe wskaźniki. Programista jest odpowiedzialny za ręczne sprawdzanie wartości false lub wskaźnika nullptr po każdej operacji. Pominięcie takiego sprawdzenia może prowadzić do niezdefiniowanego zachowania lub awarii programu.
+Wersja w Ruście wykorzystuje typ Result, który jest typem wyliczeniowym (enum) mogącym przyjąć jeden z dwóch wariantów: Ok(wartość) w przypadku sukcesu lub Err(błąd) w przypadku porażki. Użycie konstrukcji match zmusza programistę do jawnego obsłużenia obu scenariuszy już na etapie kompilacji. Eliminuje to całą klasę błędów polegających na zignorowaniu niepowodzenia operacji. Kompilator Rusta nie pozwoliłby na użycie zmiennej dump lub exception bez uprzedniego "rozpakowania" jej z wariantu Ok.
+\subsubsection{Bezpieczeństwo Pamięci}
+Kod w C++ operuje na surowych wskaźnikach const char* przekazywanych z zewnątrz. Rust, mimo że również musi obsłużyć te wskaźniki w interfejsie FFI (Foreign Function Interface), natychmiast opakowuje je w bezpieczne abstrakcje.
+\begin{itemize}
+    \item Kod w C++:
+    \input{code_frags/cpp/2.tex}
+    \item Kod w Rust:
+    \input{code_frags/rust/2.tex}
+\end{itemize}
+W C++ const char* nie przechowuje informacji o swojej długości i jest podatny na błędy odczytu poza alokowaną pamięcią. W Ruście surowy wskaźnik *const c\_char jest natychmiast konwertowany na bezpieczny typ \&CStr. Co istotne, operacja ta jest zamknięta w bloku unsafe, co jasno sygnalizuje miejsce, gdzie programista bierze na siebie odpowiedzialność za poprawność wskaźnika. Zaraz po tym następuje próba konwersji do bezpiecznego, zarządzanego przez Rusta typu \&str, która dodatkowo weryfikuje poprawność kodowania UTF-8. Cały pozostały kod funkcji operuje już na bezpiecznych typach, minimalizując powierzchnię ataku.
+\subsubsection{Operacje plikowe i parsowanie}
+W funkcji DumpCheckMemory widoczna jest znacząca różnica w sposobie obsługi operacji wejścia/wyjścia oraz parsowania danych
+\begin{itemize}
+    \item Kod w C++:
+    \input{code_frags/cpp/3.tex}
+    \item Kod w Rust:
+    \input{code_frags/rust/3.tex}
+\end{itemize}
+Podejście z C++ jest niskopoziomowe i podatne na błędy. Programista musi ręcznie zarządzać uchwytem do pliku (FILE*), pamiętając o jego zamknięciu (fclose) w każdej możliwej ścieżce wyjścia z funkcji. Funkcja fscanf z formatem %p może zachowywać się różnie w zależności od platformy i jest trudna w bezpiecznym użyciu.
+Biblioteka standardowa Rusta oferuje znacznie bezpieczniejsze i bardziej wyraziste abstrakcje. Funkcja fs::read\_to\_string w jednej, atomowej operacji otwiera plik, odczytuje całą jego zawartość do String i automatycznie go zamyka (dzięki mechanizmowi RAII), a wynik zwraca jako Result. Parsowanie jest również jawne i bezpieczne: u64::from\_str\_radix wymaga podania podstawy systemu liczbowego (tutaj 16) i również zwraca Result, co chroni przed niepoprawnym formatem danych w pliku. Takie podejście jest nie tylko bezpieczniejsze, ale również czytelniejsze.
 \subsection{Architektura biblioteki testcrasher po migracji części odpowiedzialnej za wywoływanie awarii}
 
 \section{Architektura biblioteki testcrasher po migracji}
@@ -123,4 +142,13 @@ Jako że środowisko budowania zostało już wcześniej przygotowane do obsługi
 \caption{Architektura biblioteki testcrasher po 2 etapie - opracowanie własne}
 \label{fig:testcrasher-architecture2}
 \end{figure}
+
+
+\section{Migracja fragmentu odpowiedzialnego za wywoływanie awarii procesu}
+Kolejny etap prac obejmował migrację fragmentu kodu którego zadaniem było wywoływanie awarii procesu, logika za to odpowiedzialna orginalnie była zaimplementowana z pliku nsTestCrasher.cpp.
+Ta część migracji w odróżnieniu od poprzedniej nie zakłada zastąpienia zależności napisanej w języku C++.
+Jako że środowisko budowania zostało już wcześniej przygotowane do obsługi kodu Rust, prace mogły skupić się wyłącznie na implementacji.
+\subsection{Omówienie migracji części odpowiedzialnej za analizę w języku Rust}
+\subsection{Architektura biblioteki testcrasher po migracji części odpowiedzialnej za wywoływanie awarii}
+
 

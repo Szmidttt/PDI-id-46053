@@ -1,0 +1,10 @@
+\begin{lstlisting}{language = C++}
+#[no_mangle]
+pub extern "C" fn DumpHasStream(dump_file: *const c_char, ...) -> bool {
+    let path_cstr = unsafe {CStr::from_ptr(dump_file)};
+    let Ok(path_str) = path_cstr.to_str() else {
+        return false;
+    };
+    // ...
+}
+\end{lstlisting}

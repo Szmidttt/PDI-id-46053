@@ -1,0 +1,10 @@
+\begin{lstlisting}{language = C++}
+void* addr;
+FILE* fp = fopen("crash-addr", "r");
+if (!fp) return false;
+if (fscanf(fp, "%p", &addr) != 1) {
+  fclose(fp);
+  return false;
+}
+fclose(fp);
+\end{lstlisting}
