@@ -1,17 +1,15 @@
 \chapter*{Streszczenie}
 
 W niniejszej pracy znajduje się opis procesu migracji kodu należącego do fundacji Mozilla z języka C++ na język Rust.
-Głównym celem pracy jest analiza oraz praktyczna realizacja migracji fragmentu programu udostępnionego przez fundację Mozilla z języka C++ do języka Rust w celu oceny korzyści związanych z bezpieczeństwem i nowoczesnością kodu.
+Przedmiotem praktycznej realizacji jest biblioteka dynamiczna testcrasher, wykorzystywana w procesie testowania mechanizmów raportowania błędów w przeglądarce Firefox. Głównym celem pracy jest wykonanie takiej migracji oraz ocena korzyści związanych z bezpieczeństwem pamięci i nowoczesnością kodu, jakie oferuje język Rust.
 Oznacza to porównanie kodu przed i po migracji pod kątem zarządzania pamięcią, szybkością działania oraz utrzymania oprogramowania.
 Przedstawione zostają kolejne kroki podjęte w celu przeprowadzenia migracji. Najpierw wyznaczono kryteria według których dokonano wyboru fragmentu kodu, kolejne sekcje obejmują jego szczegółowa analiza i jego stopniowe przepisanie na język Rust. 
-\\\\
-Krótkie podsumowanie wniosków, wyników i ewentualnych proponowanych
-kolejnych kroków.
+Wyniki prac potwierdziły, że możliwa jest stopniowa wymiana kodu C++ na Rust w dużym projekcie przy zachowaniu pełnej kompatybilności funkcjonalnej. Nowa implementacja eliminuje ryzyko typowych błędów zarządzania pamięcią dzięki wykorzystaniu modelu własności języka Rust, co zweryfikowano za pomocą testów regresji.
 
 % Define 5-10 keywords which can describe what you're writing about
 \bigskip
 \noindent
-\textbf{Słowa kluczowe:} C++, Rust,
+\textbf{Słowa kluczowe:} C++, Rust, migracja kodu, bezpieczeństwo pamięci, Mozilla Firefox
 
 % Choose the field from the OECD list:
 % https://en.wikipedia.org/wiki/Fields_of_Science_and_Technology

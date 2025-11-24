@@ -2,17 +2,15 @@
 
 \begin{otherlanguage}{english}
 
-A short introduction.
-
-The main part which should be a bit longer. The whole abstract should take approximately a~half page.
-
-A short summary of the outcomes, results, and proposed next steps (if
-any).
+This thesis describes the process of migrating code belonging to the Mozilla Foundation from C++ to Rust. The subject of the practical implementation is the testcrasher dynamic library, used for testing error reporting mechanisms in the Firefox browser. The main objective of this thesis is to execute this migration and evaluate the benefits regarding memory safety and code modernity offered by the Rust language.
+This involves comparing the code before and after the migration in terms of memory management, performance, and software maintainability.
+The subsequent steps taken to conduct the migration are presented. First, the criteria used to select the code fragment were defined; subsequent sections cover its detailed analysis and gradual rewriting into Rust.
+The results confirmed that a gradual replacement of C++ code with Rust in a large-scale project is possible while maintaining full functional compatibility. The new implementation eliminates the risk of typical memory management errors by utilizing Rust's ownership model, which was verified using regression tests.
 
 % Define 5-10 keywords which can describe what you're writing about
 \bigskip
 \noindent
-\textbf{Keywords:} C++, Rust
+\textbf{Keywords:} C++, Rust,  code migration, memory safety, Mozilla Firefox
 
 % Choose the field from the OECD list:
 % https://en.wikipedia.org/wiki/Fields_of_Science_and_Technology
