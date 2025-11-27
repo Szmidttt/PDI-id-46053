@@ -1,25 +1,23 @@
 \chapter{Wprowadzenie}
 Język C++ od dziesięcioleci stanowi fundament systemów operacyjnych, silników gier oraz przeglądarek internetowych, w tym projektu Mozilla Firefox. Nadal pozostaje jednym z kluczowych języków w branży IT. Według raportu Stack Overflow Developer Survey 2025, 23.5\% programistów na świecie wykorzystuje ten język w swojej codziennej pracy\cite{stack-overflow-report}. Jego główną zaletą jest wysoka wydajność i kontrola nad sprzętem.
 Wiąże się to jednak z koniecznością ręcznego zarządzania pamięcią, co w skali milionów linii kodu prowadzi do trudnych do wykrycia błędów. Statystyki gigantów technologicznych, takich jak Microsoft czy Google, wskazują, że około 70\% wszystkich krytycznych luk bezpieczeństwa w ich oprogramowaniu systemowym wynika właśnie z błędów zarządzania pamięcią\cite{memory-safety}.
-\\
-Jednym z rozwiązań rozwiązujących dług technologiczny wprowadzony przez jezyk C/C++ jest język programowania Rust.
-Prace na Rustem zaczeły sie w roku 2006 jako personalny projekt jednego z pracowników fundacji Mozilla. W 2009 roku fundacja Mozilla oficjalnie zaczeła sponsorować projekt a w roku 2012 została wypuszczona wersja Rust 0.1.
-Przez następne lata prace nad Rustem były kontynuowane przy czym największą zmianą było pozbycie sie garbage collectora na rzecz systemu własności. Następnie pierwsza stabilna wersja została wypuszczona w 15 maja 2015 roku od tego momentu rust zaczął być adoptowany w dużych projektach mozilli.
-Jednym z tych projektów był Servo - silnik przeglądarkowy który został napisany od początku w języku Rust oraz dołączony w części do Firefoxa w roku 2017. Do dnia dzisiejszego język Rust jest coraz większą częścią przeglądarki Firefox\cite{rust-stats}.
-\\
-Czemu rust jest lepszy i jakie ma limity
-Rust rozwiązał problem zarządzania pamięcią poprzez wprowadzenie wspominanego wcześniej systemu własności. Jest to zestaw zasad które określają sposób w jaki program napisany w języku Rust zarządza pamięcią. Jeżeli którakolwiek zasada systemu własności zostanie naruszona kompilator nie pozwoli na skompilowanie kodu. Dodatkowo bezpieczeństwo kodu zwiększane jest dzięki zapewnieniu bezpieczeństwa typów - użycie Result<T,E> wymusza na programiście napisanie obsługi dla błędów dzięki czemu kod staje się bardziej przewidywalny. Kolejną zaletą jest zachowanie wysokiej wydajności wykonywanego kodu. Użycie Rusta przedstawia następujące przeszkody: wolną kompilacje oraz w przypadku migracji przekroczenie granicy między językami jest skomplikowanym zadaniem. 
-\\
+
+W kontekście przeglądarek internetowych problem ten jest szczególnie istotny. Przetwarzają one niezaufane dane pochodzące z sieci, przez co często stają się wektorem ataku.
+Błędy takie jak przepełnienie bufora czy użycie zwolnionej pamięci mogą prowadzić nie tylko do awarii programu, ale dodatkowo umożliwiają atakującym wykonanie dowolnego kodu oraz kradzież wrażliwych informacji. Pomimo że C++ zapewnia programiście dużą swobodę i wydajność, odbywa się to kosztem braku wbudowanych mechanizmów weryfikacji odwołań do pamięci.
+Mimo istnienia nowoczesnych standardów C++ oraz narzędzi do analizy statycznej i dynamicznej, eliminacja tej klasy błędów w tak złożonych projektach pozostaje wyzwaniem generującym wysoki dług technologiczny. Z tego powodu organizacje takie jak NSA rekomendują odejście od języków wymagających ręcznego zarządzania pamięcią na rzecz języków bezpiecznych pamięciowo, do których zalicza się m.in. Rust.\cite{nsa-report}
+
+Jednym z rozwiązań problemów związanych z długiem technologicznym i bezpieczeństwem pamięci jest język programowania Rust.
+Jedną z jego kluczowych cech była rezygnacja z mechanizmu Garbage Collection na rzecz unikalnego modelu własności (ownership), pożyczania (borrowing) i „lifetimes”, by zapewnić bezpieczeństwo pamięci przy wydajności zbliżonej do C/C++.  Model własności to zestaw zasad które określają sposób w jaki program napisany w języku Rust zarządza pamięcią. Dodatkowo bezpieczeństwo kodu zwiększane jest dzięki zapewnieniu bezpieczeństwa typów - użycie \texttt{Result<T,E>} wymusza na programiście napisanie obsługi dla błędów dzięki czemu kod staje się bardziej przewidywalny. Jednocześnie użycie Rusta wiąże się z pewnymi ograniczeniami. Kompilator wykonuje rozbudowaną analizę borrow-checkera i optymalizacje, co powoduje wydłużenie czasu kompilacji, szczególnie przy dużych projektach. Ponadto migracja istniejącego kodu C++ do Rust lub współpraca obu języków wymaga dodatkowych warstw pośrednich, uwzględnienia różnic w konwencjach pamięci i ABI oraz starannego projektowania interfejsów, co czyni proces integracji bardziej złożonym.
+
 Wprowadzenie nowego języka do istniejącego, ogromnego projektu, jakim jest Firefox, ze względów praktycznych nie może odbyć się poprzez całkowite przepisanie kodu. Baza kodu C++ jest zbyt duża i zbyt cenna, aby ją porzucić. Z tego powodu najczęstszym podejściem jest migracja stopniowa, polegająca na wymianie poszczególnych modułów i łączeniu ich za pomocą interfejsów binarnych. Niniejsza praca skupia się na praktycznym aspekcie tego procesu na przykładzie wybranego komponentu.
 \section{Cel pracy}
-Celem pracy dyplomowej jest analiza oraz praktyczna realizacja migracji fragmentu programu udostępnionego przez fundację Mozilla z języka C++ do języka Rust w celu oceny korzyści związanych z bezpieczeństwem i nowoczesnością kodu. 
-\subsection{Cele}
+Celem pracy dyplomowej jest analiza oraz praktyczna realizacja migracji fragmentu programu udostępnionego przez fundację Mozilla z języka C++ do języka Rust. Praca stanowi Proof of Concept, mający na celu wykazanie, że możliwe jest zastąpienie kodu typu legacy bezpiecznym i nowoczesnym kodem w języku Rust, przy zachowaniu pełnej zgodności funkcjonalnej i binarnej.
 \section{Przegląd rozdziałów}
 W rozdziale drugim pracy przedstawiono istniejące rozwiązania dotyczące migracji kodu z języka C++ do języka Rust, ze szczególnym uwzględnieniem projektów realizowanych przez społeczność open source oraz inicjatyw fundacji Mozilla, które ilustrują praktyczne podejścia i narzędzia wspierające ten proces.
-\\
+
 W rozdziale trzecim szczegółowo przedstawiono praktyczny proces migracji. Opis rozpoczyna się od omówienia kryteriów, które doprowadziły do wyboru migrowanego fragmentu kodu, a następnie prezentuje jego dogłębną analizę, przyjętą strategię działania, użyte narzędzia oraz finalny, wieloetapowy proces zastępowania kodu C++ kodem Rust.
-\\
+
 W rozdziale czwartym podjęto się analizy i testów uzyskanych rezultatów oraz przedstawiono techniczne aspekty pracy. Rozpoczęto od omówienia środowiska testowego i opisano przyjętą metodologię. W kolejnych sekcjach przeprowadzono testy funkcjonalne, których celem było potwierdzenie poprawnego działania kodu. Porównano ze sobą również implementacje w C++ i Rust, biorąc pod uwagę między innymi rozmiar pliku wynikowego oraz czas kompilacji. Rozdział zakończono opisem problemów napotkanych w trakcie przeprowadzania migracji.
-\\
+
 W rozdziale piątym przedstawiono podsumowanie wykonanych prac oraz sformułowano wnioski końcowe dotyczące korzyści płynących z zastosowania języka Rust. Wskazano również potencjalne kierunki dalszego rozwoju projektu.
 
