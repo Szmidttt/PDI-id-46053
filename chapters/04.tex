@@ -1,8 +1,80 @@
 \chapter{Testowanie i wnioski końcowe}
-\section{Środowisko testowe i metodologia}
+Testy zostały przeprowadzone w następującym środowisku deweloperskim, przedstawionym poniżej:
+\begin{itemize}
+    \item {System operacyjny:} Windows 10 Pro 22H2 64-bit
+    \item {Procesor:} AMD Ryzen 5 7600X (6 × 4.70 GHz)
+    \item {Pamięć RAM:} 32 GB
+    \item {rustc:} 1.91.0
+    \item {cargo:} 1.91.0
+    \item {clang:} 19.1.5
+    \item {Firefox:} 144.0.1 (release)
+\end{itemize}
+W ramach testów funkcjonalnych oceniano poprawność działania biblioteki testcrasher po migracji z języka C++ do Rust. Uruchomiono dwa zestawy testów:
+\begin{itemize}
+    \item \textbf{Testy jednostkowe} \texttt{./mach test toolkit/crashreporter/test/unit/}
+    \item \textbf{Testy IPC} \texttt{./mach test toolkit/crashreporter/test/unit\_ipc/}
+\end{itemize}
+Testom poddano dwa główne obszary funkcjonalne biblioteki:
+\begin{itemize}
+    \item \textbf{Analiza zrzutu pamięci}
+    \begin{itemize}
+        \item {DumpHasStream()}
+        \item {DumpHasInstructionPointerMemory()}
+        \item {DumpCheckMemory()}
+    \end{itemize}
+\item \textbf{Wywoływanie awarii procesu}
+\begin{itemize}
+        \item {Crash()}
+        \item {EnablePHC()}
+        \item {GetWin64CFITestFnAddrOffset()}
+        \item {TryOverrideExceptionHandler()}
+        \item {SaveAppMemory()}
+    \end{itemize}
+\end{itemize}
+Dodatkowo weryfikowano brak regresji, rozumiany jako:
+\begin{itemize}
+    \item {zachowanie niezmienionego ABI biblioteki,}
+    \item {identyczne zachowanie funkcji eksportowanych,}
+    \item {przejście wszystkich testów XPCShell bez modyfikacji po stronie testów.}
+\end{itemize}
+W ramach analizy porównano również czas kompilacji oraz rozmiar wygenerowanej biblioteki przed i po migracji.
+Metody pomiarowe:
+\begin{itemize}
+    \item {czas kompilacji, raportowany przez mach,}   
+    \item {rozmiar pliku przez PowerShell:} \texttt{(Get-Item "testcrasher.dll").Length}
+\end{itemize}
+
 \section{Weryfikacja funkcjonalna}
-\section{Analiza }
-Rozmiar pliku\\
-czas kompilacji
+Wyniki testów przed i po migracji były identyczne, co potwierdza, że implementacja w języku Rust zachowała pełną kompatybilność funkcjonalną z wersją C++.
+\begin{itemize}
+    \item {Testy jednostkowe:}
+    \input{test_results/1.tex}
+    \item {Testy IPC:}
+    \input{test_results/2.tex}
+\end{itemize}
+Takie same wyniki uzyskano po migracji biblioteki na Rust. Oznacza to, że wszystkie ścieżki funkcjonalne zostały zachowane oraz ABI biblioteki pozostało zgodne.
+\section{Analiza czasu kompilacji i rozmiaru pliku}
+\subsection{Czas kompilacji}
+Poniżej przedstawiono wyniki testów porównawczych dotyczących czasu kompilacji biblioteki testcrasher przed i po migracji:
+\input{tables/04_lib-time.tex}
+\\
+Wzrost czasu wynika bezpośrednio z charakterystyki kompilatora Rust: analiza typów jest znacząco bardziej kosztowna obliczeniowo, Rust stosuje intensywną optymalizację kodu, generowanie jest często wolniejsze niż w przypadku C++.\cite{rustc-overview}
+Choć czas kompilacji wzrósł o 36\%, jest to niewielka różnica w skali całej przeglądarki Firefox. W praktyce zdecydowana różnica czasowa staje się pomijalna przy ciągłym rozwoju.
+\subsection{Rozmiar pliku biblioteki}
+Poniżej przedstawiono wyniki testów porównawczych dotyczących rozmiaru pliku biblioteki testcrasher przed i po migracji:
+\input{tables/05_lib-size.tex}
+\\
+Znaczne zwiększenie rozmiaru biblioteki wynika z charakterystyki kompilatora Rust, który statycznie dołącza część niezbędnych elementów bibliotecznych, generuje bardziej rozbudowane konstrukcje wewnętrzne, wynikające z modelu bezpieczeństwa pamięci oraz typów opisujących błędy, nie korzysta z udostępnianych przez system współdzielonych bibliotek, co skutkuje większą ilością kodu dołączanego do finalnego pliku w porównaniu do kompilacji C++.\cite{rustlib}\cite{linking-rust-crates}
+W praktyce zwiększenie rozmiaru z 167 KB do 455 KB nie ma wpływu na działanie systemu.
+
 \section{Napotkane problemy i ograniczenia}
-\section{wnioski końcowe}
+W trakcie migracji zidentyfikowano następujące problemy i utrudnienia:
+\begin{itemize}
+    \item \textbf{Różnice w obsłudze błędów.} W C++ błędy sygnalizowane są przez nullptr i wartości logiczne, podczas gdy w Rust wymuszona jest obsługa Result<T, E> oraz Option<T>.
+    \item \textbf{Różnice między Breakpad a rust-minidump.} API rust-minidump nie jest bezpośrednim odpowiednikiem Google Breakpad, co wymagało zmiany sposobu parsowania zrzutów pamięci.
+    \item \textbf{Długi czas kompilacji.} Pełna kompilacja projektu na podanym systemie trwa ok. 30 minut. Możliwe jest kompilowanie wyłącznie modułów, jednak nie zawsze jest to wystarczające, szczególnie w przypadku zmian ABI lub plików moz.build.
+\end{itemize}
+\section{Wnioski końcowe}
+Przeprowadzona migracja fragmentu biblioteki testcrasher z języka C++ do Rust pozwoliła na praktyczną weryfikację przedstawionych założeń pracy. Zgodnie z celem pracy, polegającym na ocenie możliwości zastąpienia kodu typu legacy nowoczesnym i bezpieczniejszym kodem Rust, uzyskane wyniki potwierdzają, że taka migracja jest jak najbardziej możliwa oraz uzasadniona.
+Podsumowując, migracja analizowanego modułu potwierdza, że Rust jest realną i skuteczną alternatywą dla C++, może być wdrażany stopniowo w dużych projektach, zapewnia korzyści w zakresie bezpieczeństwa pamięci i jakości kodu oraz nie zakłóca stabilności ani kompatybilności całego systemu.
+Otrzymane wyniki potwierdzają zasadność stosowania Rust w projektach o wysokim znaczeniu dla bezpieczeństwa, takich jak Mozilla Firefox, oraz wskazują kierunek dla dalszej modernizacji istniejących komponentów.
