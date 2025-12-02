@@ -42,14 +42,13 @@ Kod źródłowy biblioteki korzysta w niewielkim stopniu z kluczowych mechanizm�
 \\
 System budowania Mozilli, w przypadku biblioteki testcrasher stosuje metodę gdzie pliki .cpp są łączone w jedną jednostkę kompilacji w celu przyspieszenia procesu. Następnie skompilowany kod obiektowy jest linkowany w ostateczną bibliotekę dynamiczną testcrasher.dll.
 \\
-Głównym sposobem użycia biblioteki sa zautomatyzowane testy, najczęściej pisane w JavaScripcie i uruchamiane w specjalnym frameworku testowym Mozilli(xpcshell-test). Skrypt testowy wywołuje wyeksportowaną funkcję z testcrasher.dll w celu spowodowania awarii i sprawdzenia czy moduł Crash Reporter wygenerował poprawny plik zrzutu pamięci.
+Głównym sposobem użycia biblioteki sa zautomatyzowane testy, najczęściej pisane w JavaScripcie i uruchamiane w specjalnym frameworku testowym Mozilli. Skrypt testowy wywołuje wyeksportowaną funkcję z testcrasher.dll w celu spowodowania awarii i sprawdzenia czy moduł Crash Reporter wygenerował poprawny plik zrzutu pamięci.
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.8\linewidth]{figures/testcrasher.png}
 \caption{Architektura biblioteki testcrasher - opracowanie własne}
 \label{fig:testcrasher-architecture}
 \end{figure}
-
 \section{Strategia migracji i wykorzystane narzędzia}
 Po wyborze biblioteki testcrasher jako fragmentu kodu do migracji na język Rust kolejnym ważnym aspektem był dobór odpowiedniej strategii oraz narzędzi.
 Obrane podejście musiało uwzględniać specyfikę pracy z dużą bazę kodu jaką, jest projekt Mozilla Firefox. 
@@ -65,7 +64,6 @@ Proces migracji został zaplanowany w następujących, logicznie następujących
     \item \textbf{Finalizacja i czyszczenie konfiguracji:} Po zakończeniu migracji całości kodu funkcjonalnego do języka Rust, oryginalne pliki źródłowe C++ (dumputils.cpp oraz nsTestCrasher.cpp) są ostatecznie usuwane z drzewa projektu. Konfiguracja w pliku moz.build jest upraszczana, eliminując reguły dotyczące kompilacji C++ dla tej biblioteki.
 \end{enumerate}
 Dzięki takiemu podejściu, w dowolnym momencie procesu migracji biblioteka pozostaje w pełni funkcjonalna, zawierając mieszankę działającego kodu C++ i Rust.
-
 \subsection{Wykorzytane narzędzia i technologie}
 Do przeprowadzenia migracji wybranego fragmentu kodu użyto:
 \begin{itemize}
@@ -78,29 +76,22 @@ Do przeprowadzenia migracji wybranego fragmentu kodu użyto:
 Proces migracji komponentu odpowiedzialnego za analizę zrzutów pamięci, zaimplementowanego pierwotnie w pliku dumputils.cpp, rozpoczęto od przygotowania środowiska deweloperskiego. Celem było umożliwienie kompilacji kodu Rust i jego integracji z istniejącą, opartą na C++, strukturą biblioteki testcrasher.
 \subsection{Przygotowanie środowiska}
 Integracja nowego kodu w języku Rust z rozbudowanym ekosystemem przeglądarki Firefox wymagała przeprowadzenia kilku operacji konfiguracyjnych w systemie budowania.
-\\
-Pierwszym krokiem było zdefiniowanie nowego crate - podstawowej jednostki kompilacji i dystrybucji w ekosystemie Rust. W tym crate docelowo miała znaleźć się cała nowa implementacja funkcjonalności biblioteki testcrasher.
-\\
-Następnie, nowo utworzony crate musiał zostać włączony do głównego "workspace" projektu Firefox. Workspace w kontekście narzędzia Cargo (menedżera pakietów Rust) to zbiór crate'ów, które są zarządzane i kompilowane wspólnie. Dodanie testcrasher do tej struktury formalnie uczyniło go częścią przeglądarki.
-\\
-Kolejnym krokiem było zsynchronizowanie zależności dla całego projektu. Wykonano to za pomocą polecenia \texttt{cargo update -p workspace-hack}. Polecenie to aktualizuje plik Cargo.lock dla całego workspace, zapewniając spójność wersji wszystkich zależności i umożliwiając systemowi budowania poprawne przetwarzanie nowego komponentu.
-\\
-Ostatnim, etapem było zmodyfikowanie pliku konfiguracyjnego systemu budowania - moz.build w folderze testcrasher oraz dodanie nowego pliku moz.build w folderze zawierającym kod źródłowy Rust. Pliki moz.build, są skryptami w języku Python, jednak ich działanie jest określone poprzez specjalne zasady określone przez Mozille. Ich celem jest określienie funkcjonalności plików w folderze w którym się znajdują\cite{mozbuild}. W przypadku biblioteki testcrasher plik moz.build po modyfikacjach wyglądał następująco:
 
-% \begin{figure}[H]
-% \centering
-% \includegraphics[width=0.8\linewidth]{figures/mozbuild1-1.png}
-% \caption{Zawartość pliku konfiguracyjnego moz.build budujący biblioteke testcrasher - etap 1 cz.1}
-% \label{fig:mozbuild-1-1}
-% \end{figure}
-% \begin{figure}[H]
-% \centering
-% \includegraphics[width=0.8\linewidth]{figures/mozbuild1-2.png}
-% \caption{Zawartość pliku konfiguracyjnego moz.build budujący biblioteke testcrasher - etap 1 cz.2}
-% \label{fig:mozbuild-1-2}
-% \end{figure}
+Pierwszym krokiem było zdefiniowanie nowego crate - podstawowej jednostki kompilacji i dystrybucji w ekosystemie Rust. W katalogu komponentu utworzono podkatalog rust w ktorym umieszczono trzy pliki:
+\begin{itemize}
+\item \textbf{Cargo.toml} - manifest pakietu, definiujący jego metadane (nazwę, wersję, edycję języka "2021") oraz zależności. Skonfigurowano go tak, aby generował bibliotekę statyczną crate-type = ["staticlib"], co jest niezbędne do późniejszego linkowania z kodem C++.
+\item \textbf{lib.rs} - punkt wejścia do biblioteki, początkowo zawierający jedynie szkielet modułu.
+\item \textbf{moz.build} - plik systemu budowania Mozilli umożliwiający kompilację kodu Rust zgodnie z manifestem pakietu.
+\end{itemize}
+W tym crate docelowo ma znaleźć się cała nowa implementacja funkcjonalności biblioteki testcrasher.
+
+Następnie, nowo utworzony crate musiał zostać włączony do głównego "workspace" projektu Firefox. Workspace w kontekście narzędzia Cargo (menedżera pakietów Rust) to zbiór crate'ów, które są zarządzane i kompilowane wspólnie. Dodanie testcrasher do tej struktury formalnie uczyniło go częścią przeglądarki.
+
+Kolejnym krokiem było zsynchronizowanie zależności dla całego projektu. Wykonano to za pomocą polecenia \texttt{cargo update -p workspace-hack}. Polecenie to aktualizuje plik Cargo.lock dla całego workspace, zapewniając spójność wersji wszystkich zależności i umożliwiając systemowi budowania poprawne przetwarzanie nowego komponentu.
+
+Ostatnim, etapem było zmodyfikowanie pliku konfiguracyjnego systemu budowania - moz.build w folderze testcrasher oraz dodanie nowego pliku moz.build w folderze zawierającym kod źródłowy Rust. Pliki moz.build, są skryptami w języku Python, jednak ich działanie jest określone poprzez specjalne zasady określone przez Mozille. Ich celem jest określienie funkcjonalności plików w folderze w którym się znajdują\cite{mozbuild}. W przypadku biblioteki testcrasher plik moz.build po modyfikacjach wyglądał następująco:
 \input{code_frags/moz.build/1.tex}
-Modyfikacje dokonane w pliku moz.build umożliwiają współistnienie kodu C++ oraz Rust w ramach finalnej biblioteki testcrasher.dll. Konfiguracja ta instruuje system budowania, aby dołączył rust\_testcrasher.lib - bibliotekę statyczną zawierającą skompilowany kod Rust do finalnej biblioteki testcrasher.dll.
+Modyfikacje dokonane w pliku moz.build umożliwiają współistnienie kodu C++ oraz Rust w ramach finalnej biblioteki testcrasher.dll. Konfiguracja ta instruuje system budowania, aby dołączył rust\_testcrasher.lib - bibliotekę statyczną zawierającą skompilowany kod Rust do finalnej biblioteki testcrasher.dll. Istotnym elementem przyjętej strategii było tymczasowe zachowanie pliku dumputils.cpp oraz zależności od Google Breakpad. Takie podejście umożliwiło stopniowe przepisywanie funkcjonalności oraz weryfikację stabilności rozwiązania poprzez testy funkcjonalne po każdej zmianie.
 Szczegółowa lista zmian wraz z ich celem znajduje się w tabeli \ref{tab:mozbuild-1}.
 \input{tables/03_mozbuild-mods.tex}
 \subsection{Omówienie migracji części odpowiedzialnej za analizę w języku Rust}
@@ -133,22 +124,56 @@ W funkcji DumpCheckMemory widoczna jest znacząca różnica w sposobie obsługi 
 \end{itemize}
 Podejście z C++ jest niskopoziomowe i podatne na błędy. Programista musi ręcznie zarządzać uchwytem do pliku (FILE*), pamiętając o jego zamknięciu (fclose) w każdej możliwej ścieżce wyjścia z funkcji. Funkcja fscanf z formatem %p może zachowywać się różnie w zależności od platformy i jest trudna w bezpiecznym użyciu.
 Biblioteka standardowa Rusta oferuje znacznie bezpieczniejsze i bardziej wyraziste abstrakcje. Funkcja fs::read\_to\_string w jednej, atomowej operacji otwiera plik, odczytuje całą jego zawartość do String i automatycznie go zamyka (dzięki mechanizmowi RAII), a wynik zwraca jako Result. Parsowanie jest również jawne i bezpieczne: u64::from\_str\_radix wymaga podania podstawy systemu liczbowego (tutaj 16) i również zwraca Result, co chroni przed niepoprawnym formatem danych w pliku. Takie podejście jest nie tylko bezpieczniejsze, ale również czytelniejsze.
-\subsection{Architektura biblioteki testcrasher po migracji części odpowiedzialnej za wywoływanie awarii}
-
-\section{Architektura biblioteki testcrasher po migracji}
+\subsection{Architektura po migracji modułu analityczneg}
+W tym kroku, po pomyślnej reimplementacji logiki analizy zrzutów pamięci, możliwe stało się całkowite wyeliminowanie zależności od biblioteki Google Breakpad oraz usunięcie pliku źródłowego dumputils.cpp. Funkcjonalność ta została w pełni przejęta przez kod w języku Rust. Uproszczoną strukturę biblioteki, pozbawioną już komponentów analitycznych napisanych w C++, przedstawiono na schemacie blokowym \ref{fig:testcrasher-architecture2}. Widać na nim, że plik moz.build nie odwołuje się już do źródeł Breakpada, a jedynie do biblioteki rust\_testcrasher oraz pozostawionego jeszcze pliku nsTestCrasher.cpp.
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.8\linewidth]{figures/testcrasher2.png}
-\caption{Architektura biblioteki testcrasher po 2 etapie - opracowanie własne}
+\caption{Architektura biblioteki testcrasher - Etap 2 - opracowanie własne}
 \label{fig:testcrasher-architecture2}
 \end{figure}
-
-
 \section{Migracja fragmentu odpowiedzialnego za wywoływanie awarii procesu}
 Kolejny etap prac obejmował migrację fragmentu kodu którego zadaniem było wywoływanie awarii procesu, logika za to odpowiedzialna orginalnie była zaimplementowana z pliku nsTestCrasher.cpp.
 Ta część migracji w odróżnieniu od poprzedniej nie zakłada zastąpienia zależności napisanej w języku C++.
-Jako że środowisko budowania zostało już wcześniej przygotowane do obsługi kodu Rust, prace mogły skupić się wyłącznie na implementacji.
+Podobnie jak w poprzednim etapie migracji trzeba było rozpocząć od przygotowania systemu budowania Mozilli.
+\subsection{Przygotowanie środowiska}%TODO
+Prace nad migracją fragmentu wymagały zmian w konfiguracji zarówno pliku systemu budowania moz.build oraz w pliku manifestu pakietu Cargo.toml. Głównym celem było dodanie nowej zależności do projektu Mozilla jakią był crate sadness-generator który zapewniał implementacje niektórych awarii procesu.
+\subsubsection{Dodanie zależności i proces weryfikacji}
+Procedura dodania biblioteki sadness-generator przebiegała dwuetapowo:
+\begin{enumerate}
+\item \textbf{Deklaracja wersji:} Pierwszym krokiem była modyfikacja pliku Cargo.toml w katalogu komponentu. W przypadku bibliotek, które już znajdują się w drzewie projektu, wystarczy wskazać ich wersję.
+\item \textbf{Vendorowanie (Vendor-ing):} Ponieważ sadness-generator był nową zależnością, nieobecną w repozytorium, konieczne było pobranie jej kodu źródłowego i dołączenie go do projektu. Służy do tego polecenie:
+\begin{verbatim}
+./mach vendor rust
+\end{verbatim}
+\end{enumerate}
+
+Podczas realizacji tego kroku napotkano istotne wyzwanie związane ze środowiskiem pracy. Komenda \texttt{mach vendor rust} wykazywała niestabilność na systemie Windows, co jest znanym problemem w systemie śledzenia błędów Bugzilla\cite{bug1938341}. Aby kontynuować prace, proces vendorowania przeprowadzono w środowisku WSL (Windows Subsystem for Linux), co pozwoliło na poprawne pobranie źródeł.
+\subsubsection{Flaga MOZ\_PHC}
+Istotnym wyzwaniem była synchronizacja ustawień kompilacji między systemem budowania Mozilli a Cargo. Mechanizm PHC (Probabilistic Heap Checker) jest opcjonalny i włączany globalną flagą MOZ\_PHC. Kod w Rust nie ma jednak bezpośredniego dostępu do zmiennych środowiskowych procesu budowania.
+Aby rozwiązać ten problem, zastosowano mechanizm Rust features. W pliku moz.build dodano logikę, która sprawdza globalną konfigurację i warunkowo aktywuje odpowiednią flagę dla kompilatora Rust:
+\input{code_frags/cargo.toml/moz_phc.tex}
+\input{code_frags/moz.build/moz_phc.tex}
+Dzięki temu zabiegowi, w kodzie źródłowym Rust możliwe stało się użycie atrybutu \texttt{\#[cfg(feature = "moz\_phc")]}, aby warunkowo kompilować fragmenty kodu odpowiedzialne za współpracę z PHC, tylko wtedy, gdy mechanizm ten jest aktywny w przeglądarce.
+\subsubsection{Przygotowanie warstwy pośredniczącej (FFI)}
+Dodatkowo w tym przypadku niemożliwe było przeprowadzenie kompletnej migracji na język Rust. Spowodowane było to faktem że wiele fundamentalnych funkcji, takich jak makro \texttt{MOZ\_CRASH()} (służące do bezpiecznego przerywania działania programu w krytycznych momentach), jest zaimplementowanych jako makra preprocesora C++ lub funkcje \texttt{inline}. Język Rust, komunikując się poprzez interfejs FFI (Foreign Function Interface), może łączyć się jedynie z istniejącymi symbolami, a nie z dyrektywami preprocesora, które znikają po etapie kompilacji C++.
+W związku z tym, aby zmapować mechanizm \texttt{panic!()} w Rust na systemowe wywołanie awarii w Firefoxie, konieczne było zastosowanie wzorca projektowego Shim (adaptera). Stworzono dedykowaną warstwę kodu łączącego, umożliwia wykorzystanie kodu C++ przez kod w Rust. W tym celu utworzono dwa pliki:
+\begin{itemize}
+    \item \textbf{wrapper.h} - uproszczony plik nagłówkowy, przygotowany specjalnie dla narzędzia bindgen. Zdefiniowano w nim tylko te typy i funkcje, które są niezbędne dla Rusta, ukrywając resztę złożoności nagłówków C++.
+    \item \input{code_frags/h/wrapper.tex}
+    \item \textbf{wrapper.cpp} -  plik implementacyjny, który pełni dwie funkcje:
+    \begin{enumerate}
+        \item Udostępnia funkcje pośredniczące (wrappery) do mechanizmów Mozilli, np. \texttt{Rust\_moz\_xmalloc} czy \texttt{Rust\_SetPHCState}.
+        \item Implementuje specyficzne dla C++ scenariusze błędów, niemożliwe do pełnego odwzorowania w Rust (np. funkcja \texttt{PureVirtualCall} wywołująca błąd czystej funkcji wirtualnej).
+    \end{enumerate}
+    \input{code_frags/cpp/wrapper.tex}
+\end{itemize}
+Takie podejście zapewniło czystą separację i pozwoliło uniknąć błędów kompilacji, które pojawiały się przy próbie bezpośredniego parsowania pełnych nagłówków silnika Gecko przez narzędzie bindgen. 
+Rezultatem wykonania komendy \texttt{bindgen} był plik bindings.rs, który zawierał interfejs programistyczny (API) zrozumiany dla kompilatora Rust.
+Należy jednak podkreślić, że plik ten nie zawierał faktycznej implementacji (ciał funkcji), a jedynie ich deklaracje zamknięte w blokach \texttt{extern "C"}. Z perspektywy języka Rust są to tzw. symbole zewnętrzne - obietnica, że kod maszynowy tych funkcji zostanie dostarczony później. Fizyczne powiązanie tych deklaracji z ich wykonawczymi odpowiednikami (zaimplementowanymi w wrapper.cpp) następuje dopiero w fazie linkowania. Wówczas linker łączy skompilowany kod Rusta ze skompilowanym obiektem C++, rozwiązując puste symbole i tworząc działającą bibliotekę.
+Wygenerowany fragment pliku bindings.rs przedstawiono na listingu poniżej:
+\input{code_frags/rust/bindings.tex}
 \subsection{Omówienie migracji części odpowiedzialnej za analizę w języku Rust}
-\subsection{Architektura biblioteki testcrasher po migracji części odpowiedzialnej za wywoływanie awarii}
+\subsection{Architektura po migracji}
 
 

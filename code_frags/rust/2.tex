@@ -1,4 +1,4 @@
-\begin{lstlisting}{language = C++}
+\begin{lstlisting}[language = c++, caption={}]
 #[no_mangle]
 pub extern "C" fn DumpHasStream(dump_file: *const c_char, ...) -> bool {
     let path_cstr = unsafe {CStr::from_ptr(dump_file)};
