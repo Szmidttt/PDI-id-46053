@@ -15,35 +15,11 @@ W ramach testów funkcjonalnych oceniano poprawność działania biblioteki test
     \item \textbf{Testy IPC} \texttt{./mach test toolkit/crashreporter/test/unit\_ipc/}
 \end{itemize}
 Testom poddano dwa główne obszary funkcjonalne biblioteki:
-\begin{itemize}
-    \item \textbf{Analiza zrzutu pamięci}
-    \begin{itemize}
-        \item {DumpHasStream()}
-        \item {DumpHasInstructionPointerMemory()}
-        \item {DumpCheckMemory()}
-    \end{itemize}
-\item \textbf{Wywoływanie awarii procesu}
-\begin{itemize}
-        \item {Crash()}
-        \item {EnablePHC()}
-        \item {GetWin64CFITestFnAddrOffset()}
-        \item {TryOverrideExceptionHandler()}
-        \item {SaveAppMemory()}
-    \end{itemize}
-\end{itemize}
-Dodatkowo weryfikowano brak regresji, rozumiany jako:
-\begin{itemize}
-    \item {zachowanie niezmienionego ABI biblioteki,}
-    \item {identyczne zachowanie funkcji eksportowanych,}
-    \item {przejście wszystkich testów XPCShell bez modyfikacji po stronie testów.}
-\end{itemize}
-W ramach analizy porównano również czas kompilacji oraz rozmiar wygenerowanej biblioteki przed i po migracji.
-Metody pomiarowe:
-\begin{itemize}
-    \item {czas kompilacji, raportowany przez mach,}   
-    \item {rozmiar pliku przez PowerShell:} \texttt{(Get-Item "testcrasher.dll").Length}
-\end{itemize}
-
+analiza zrzutu pamięci: \textbf{DumpHasStream()}, \textbf{DumpHasInstructionPointerMemory()}, \textbf{DumpCheckMemory()} oraz
+wywoływanie awarii procesu: \textbf{Crash()}, \textbf{EnablePHC()}, \textbf{GetWin64CFITestFnAddrOffset()}, \textbf{TryOverrideExceptionHandler()}, \textbf{SaveAppMemory()}.
+Dodatkowo weryfikowano brak regresji, rozumiany jako zachowanie niezmienionego ABI biblioteki, identyczne zachowanie funkcji eksportowanych oraz przejście wszystkich testów XPCShell bez modyfikacji po stronie testów.
+W ramach analizy porównano również czas kompilacji oraz rozmiar wygenerowanej biblioteki przed i po migracji. \\
+Do obliczenia czasu kompilacji oraz rozmiaru pliku biblioteki testcrasher zostały użyte następujące metody pomiarowe: czas kompilacji, raportowany przez \texttt{mach}, oraz rozmiar pliku, raportowany przez PowerShell: \texttt{(Get-Item "testcrasher.dll").Length}.
 \section{Weryfikacja funkcjonalna}
 Wyniki testów przed i po migracji były identyczne, co potwierdza, że implementacja w języku Rust zachowała pełną kompatybilność funkcjonalną z wersją C++.
 \begin{itemize}
@@ -68,7 +44,7 @@ Znaczne zwiększenie rozmiaru biblioteki wynika z charakterystyki kompilatora Ru
 W praktyce zwiększenie rozmiaru z 167 KB do 455 KB nie ma wpływu na działanie systemu.
 
 \section{Napotkane problemy i ograniczenia}
-W trakcie migracji zidentyfikowano następujące problemy i utrudnienia:
+W trakcie migracji zidentyfikowano następujące problemy i ograniczenia:
 \begin{itemize}
     \item \textbf{Różnice w obsłudze błędów.} W C++ błędy sygnalizowane są przez nullptr i wartości logiczne, podczas gdy w Rust wymuszona jest obsługa Result<T, E> oraz Option<T>.
     \item \textbf{Różnice między Breakpad a rust-minidump.} API rust-minidump nie jest bezpośrednim odpowiednikiem Google Breakpad, co wymagało zmiany sposobu parsowania zrzutów pamięci.
