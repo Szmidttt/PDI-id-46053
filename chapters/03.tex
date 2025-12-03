@@ -27,11 +27,11 @@ Jej działanie skupia się na dwóch obszarach:
     \end{itemize}
     \item \textbf{Wywoływanie awarii procesu:} Za tą część odpowiada plik nsTestCrasher.cpp. API tej części zawiera:
     \begin{itemize}
-        \item \textbf{Crash()}
-        \item \textbf{EnablePHC()}
-        \item \textbf{GetWin64CFITestFnAddrOffset()}
-        \item \textbf{TryOverrideExceptionHandler()}
-        \item \textbf{SaveAppMemory()}
+        \item \textbf{Crash():} Funkcja odpowiedzialna za wywoływanie awarii procesu. Jest to w zasadzie struktura switch case która dopasowuje numer awarii do jej implementacji. 
+        \item \textbf{EnablePHC():} Uruchamia mechanizm PHC(Probabilistic Heap Checker)
+        \item \textbf{GetWin64CFITestFnAddrOffset():} Zwraca prawdziwy adres (RVA) funkcji asemblerowej w relacji do lokalizacji biblioteki testcrasher.dll.
+        \item \textbf{TryOverrideExceptionHandler():} Próbuje nadpisać Windowsowy mechanizm obsługi wyjątków.
+        \item \textbf{SaveAppMemory():} 
     \end{itemize}
 \end{itemize}
 \subsection{Architektura biblioteki testcrasher przed migracją}
@@ -65,11 +65,27 @@ Proces migracji został zaplanowany w następujących, logicznie następujących
 \end{enumerate}
 Dzięki takiemu podejściu, w dowolnym momencie procesu migracji biblioteka pozostaje w pełni funkcjonalna, zawierając mieszankę działającego kodu C++ i Rust.
 \subsection{Wykorzytane narzędzia i technologie}
-Do przeprowadzenia migracji wybranego fragmentu kodu użyto:
+Do przeprowadzenia migracji wybranego fragmentu kodu użyto następujących narzędzi i technologi:
 \begin{itemize}
+    \item \textbf{Środowisko i system budowania:}
+    \begin{itemize}
+        \item \textbf{mach:} Narzędzie wiersza poleceń (CLI) stworzone przez fundacje Mozilla w celu wspomagania rozwoju przeglądarki Firefox, zaimplementowane w języku Python. Pełni ono funkcję generycznego dyspozytora poleceń. W pracy głównym użyciem było uruchamianie budowania biblioteki oraz uruchamiane testów.
+        \item \textbf{WSL (Windows Subsystem for Linux):} Wirtualne środowisko wykorzystane pomocniczo do procesu vendorowania bibliotek Rust. Jego użycie było konieczne z powodu na niestabliność mechanizmu pobierania zależności na Windowsie.
+    \end{itemize}
+    \item \textbf{Narzędzia umożliwiajęce interoperacyjność:}
+    \begin{itemize}
+        \item \textbf{Bindgen-cli (v0.72.1):} Narzędzie wiersza poleceń służące do automatycznego generowania wiązań (ang. \textit{bindings}) dla języka Rust na podstawie nagłówków C++. Zdecydowano się na statyczne wygenerowanie plików zamiast generowania ich w czasie kompilacji. Jest to zgodne z praktyką stosowaną w projekcie Firefox\cite{rust-integration}. Podejście to jest rekomendowane w sytuacjach, gdy natywne API jest stabilne, co pozwala uniknąć niepotrzebnego wydłużania czasu kompilacji projektu.
+    \end{itemize}
     \item \textbf{Biblioteki Rust(Crate):}
     \begin{itemize}
-        \item \textbf{rust-minidump:} Kolekcja bibliotek służąca do odczytu i analizy plików zrzutu pamięci, modelowana na podstawie Google Breakpad\cite{rust-minidump}. W celu przeprowadzenia migracji użyta została biblioteka minidump-processor.
+        \item \textbf{rust-minidump v(0.24):} Kolekcja bibliotek służąca do odczytu i analizy plików zrzutu pamięci, modelowana na podstawie Google Breakpad\cite{rust-minidump}. W celu przeprowadzenia migracji użyta została biblioteka minidump-processor.
+        \item \textbf{sadness-generator (v0.6):} Crate zawierający implementacje kodu wywołującego awarie procesu. Użyty został zgodnie z sugestią zgłaszającego bug 1798688. W praktyce jednak ze względu na specyficzne dla ekosystemu Mozilli mechanizmy obsługi błędów i zarządzania pamięcią, wykorzystanie tej biblioteki zostało ograniczone jedynie do standardowych scenariuszy awarii.
+        \item \textbf{windows-sys (v0.52):} Niskopoziomowa biblioteka dostarczająca surowe deklaracje funkcji (FFI), struktur i stałych API systemu Windows, bez dodatkowych warstw abstrakcji. Jej wybór podyktowany był koniecznością bezpośredniego wywoływania funkcji systemowych, co umożliwiło implementację scenariuszy awarii specyficznych dla platformy Windows.
+    \end{itemize}
+    \item \textbf{Narzędzia analityczne i inżynieria wsteczna:}
+    \begin{itemize}
+        \item \textbf{Searchfox:} Narzędzie do semantycznego indeksowania i przeszukiwania kodu źródłowego Mozilli. Wykorzystane do analizy migrowanego kodu oraz identyfikacji miejsc wywołań biblioteki w projekcie. Umożliwiło również poznanie obowiązującego stylu kodowania oraz adaptację istniejących wzorców projektowych.
+        \item \textbf{Bugzilla:} System śledzenia błędów pełniący rolę głównego rejestru zadań (ang. \textit{issue tracker}) w organizacji Mozilla. Posłużył do znalezienia fragmentu kodu do migracji oraz analizy wymagań funkcjonalnych.
     \end{itemize}
 \end{itemize}
 \section{Migracja części odpowiedzialnej za anlizę zrzutów pamięci}
@@ -85,7 +101,7 @@ Pierwszym krokiem było zdefiniowanie nowego crate - podstawowej jednostki kompi
 \end{itemize}
 W tym crate docelowo ma znaleźć się cała nowa implementacja funkcjonalności biblioteki testcrasher.
 
-Następnie, nowo utworzony crate musiał zostać włączony do głównego "workspace" projektu Firefox. Workspace w kontekście narzędzia Cargo (menedżera pakietów Rust) to zbiór crate'ów, które są zarządzane i kompilowane wspólnie. Dodanie testcrasher do tej struktury formalnie uczyniło go częścią przeglądarki.
+Następnie, nowo utworzony crate musiał zostać włączony do głównego workspace projektu Firefox. Workspace w kontekście narzędzia Cargo (menedżera pakietów Rust) to zbiór crate'ów, które są zarządzane i kompilowane wspólnie. Dodanie testcrasher do tej struktury formalnie uczyniło go częścią przeglądarki.
 
 Kolejnym krokiem było zsynchronizowanie zależności dla całego projektu. Wykonano to za pomocą polecenia \texttt{cargo update -p workspace-hack}. Polecenie to aktualizuje plik Cargo.lock dla całego workspace, zapewniając spójność wersji wszystkich zależności i umożliwiając systemowi budowania poprawne przetwarzanie nowego komponentu.
 
