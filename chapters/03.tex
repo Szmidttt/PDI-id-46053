@@ -27,11 +27,11 @@ Jej działanie skupia się na dwóch obszarach:
     \end{itemize}
     \item \textbf{Wywoływanie awarii procesu:} Za tą część odpowiada plik nsTestCrasher.cpp. API tej części zawiera:
     \begin{itemize}
-        \item \textbf{Crash():} Funkcja odpowiedzialna za wywoływanie awarii procesu. Jest to w zasadzie struktura switch case która dopasowuje numer awarii do jej implementacji. 
-        \item \textbf{EnablePHC():} Uruchamia mechanizm PHC(Probabilistic Heap Checker)
-        \item \textbf{GetWin64CFITestFnAddrOffset():} Zwraca prawdziwy adres (RVA) funkcji asemblerowej w relacji do lokalizacji biblioteki testcrasher.dll.
-        \item \textbf{TryOverrideExceptionHandler():} Próbuje nadpisać Windowsowy mechanizm obsługi wyjątków.
-        \item \textbf{SaveAppMemory():} 
+        \item \textbf{Crash():} Funkcja pełniąca rolę głównego dyspozytora, odpowiedzialna za celowe wywołanie awarii procesu. Na podstawie przekazanego argumentu uruchamia odpowiednią implementację błędu.
+        \item \textbf{EnablePHC():} Aktywuje mechanizm Probabilistic Heap Checker.
+        \item \textbf{GetWin64CFITestFnAddrOffset():} Oblicza i zwraca relatywny adres wirtualny (RVA) funkcji asemblerowych służących do testów CFI (Control Flow Integrity), w odniesieniu do adresu bazowego biblioteki  testcrasher.dll.
+        \item \textbf{TryOverrideExceptionHandler():} Rejestruje niestandardowy filtr wyjątków nieobsłużonych (poprzez API Windows \texttt{SetUnhandledExceptionFilter}), który wymusza natychmiastowe zakończenie procesu w momencie wystąpienia błędu.
+        \item \textbf{SaveAppMemory():} Alokuje testowy bufor pamięci, wypełnia go określonym wzorcem danych, a następnie zapisuje jego adres do pliku \texttt{crash-addr}. Służy to weryfikacji, czy mechanizm raportowania awarii poprawnie dołącza wskazane, dodatkowe obszary pamięci aplikacji do wygenerowanego pliku zrzutu (minidump).
     \end{itemize}
 \end{itemize}
 \subsection{Architektura biblioteki testcrasher przed migracją}
@@ -67,6 +67,13 @@ Dzięki takiemu podejściu, w dowolnym momencie procesu migracji biblioteka pozo
 \subsection{Wykorzytane narzędzia i technologie}
 Do przeprowadzenia migracji wybranego fragmentu kodu użyto następujących narzędzi i technologi:
 \begin{itemize}
+    \item \textbf{Języki programowania i platforma:}
+    \begin{itemize}
+        \item Rust (v1.91)
+        \item C++ (Standard C++17)
+        \item Python 3.12
+        \item Windows 10 Pro 22H2 64-bit
+    \end{itemize}
     \item \textbf{Środowisko i system budowania:}
     \begin{itemize}
         \item \textbf{mach:} Narzędzie wiersza poleceń (CLI) stworzone przez fundacje Mozilla w celu wspomagania rozwoju przeglądarki Firefox, zaimplementowane w języku Python. Pełni ono funkcję generycznego dyspozytora poleceń. W pracy głównym użyciem było uruchamianie budowania biblioteki oraz uruchamiane testów.
@@ -81,6 +88,7 @@ Do przeprowadzenia migracji wybranego fragmentu kodu użyto następujących narz
         \item \textbf{rust-minidump v(0.24):} Kolekcja bibliotek służąca do odczytu i analizy plików zrzutu pamięci, modelowana na podstawie Google Breakpad\cite{rust-minidump}. W celu przeprowadzenia migracji użyta została biblioteka minidump-processor.
         \item \textbf{sadness-generator (v0.6):} Crate zawierający implementacje kodu wywołującego awarie procesu. Użyty został zgodnie z sugestią zgłaszającego bug 1798688. W praktyce jednak ze względu na specyficzne dla ekosystemu Mozilli mechanizmy obsługi błędów i zarządzania pamięcią, wykorzystanie tej biblioteki zostało ograniczone jedynie do standardowych scenariuszy awarii.
         \item \textbf{windows-sys (v0.52):} Niskopoziomowa biblioteka dostarczająca surowe deklaracje funkcji (FFI), struktur i stałych API systemu Windows, bez dodatkowych warstw abstrakcji. Jej wybór podyktowany był koniecznością bezpośredniego wywoływania funkcji systemowych, co umożliwiło implementację scenariuszy awarii specyficznych dla platformy Windows.
+        \textbf{libc (v0.2):} Biblioteka zapewniająca bezpośredni dostęp do standardowych funkcji języka C (np. \texttt{malloc}, \texttt{free}). Jej użycie było kluczowe przy migracji testów mechanizmu PHC (Probabilistic Heap Checker), gdzie wymagana była surowa alokacja i zwalnianie pamięci z pominięciem bezpiecznych abstrakcji alokatora języka Rust.
     \end{itemize}
     \item \textbf{Narzędzia analityczne i inżynieria wsteczna:}
     \begin{itemize}
@@ -155,6 +163,7 @@ Podobnie jak w poprzednim etapie migracji trzeba było rozpocząć od przygotowa
 \subsection{Przygotowanie środowiska}%TODO
 Prace nad migracją fragmentu wymagały zmian w konfiguracji zarówno pliku systemu budowania moz.build oraz w pliku manifestu pakietu Cargo.toml. Głównym celem było dodanie nowej zależności do projektu Mozilla jakią był crate sadness-generator który zapewniał implementacje niektórych awarii procesu.
 \subsubsection{Dodanie zależności i proces weryfikacji}
+\label{sec:implementacja_awarii}
 Procedura dodania biblioteki sadness-generator przebiegała dwuetapowo:
 \begin{enumerate}
 \item \textbf{Deklaracja wersji:} Pierwszym krokiem była modyfikacja pliku Cargo.toml w katalogu komponentu. W przypadku bibliotek, które już znajdują się w drzewie projektu, wystarczy wskazać ich wersję.
