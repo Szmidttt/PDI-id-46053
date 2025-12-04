@@ -1,0 +1,20 @@
+\begin{lstlisting}[language=c++,caption={Dyspozycja awarii w Rust (ns\_test\_crasher.rs)}]
+#[no_mangle]
+pub unsafe extern "C" fn Crash(how: i16) {
+    match how {
+        CRASH_INVALID_POINTER_DEREF => {
+            SadnessFlavor::Segfault.make_sad();
+        },
+        CRASH_PURE_VIRTUAL_CALL => {
+            PureVirtualCall();
+        },
+        CRASH_OOM => {
+            Rust_moz_xmalloc(usize::MAX);
+            Rust_moz_xmalloc(usize::MAX);
+            Rust_moz_xmalloc(usize::MAX)
+        },
+        // inne przypadki
+    }
+}
+\end{lstlisting}
+

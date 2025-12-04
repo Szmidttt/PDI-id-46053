@@ -1,0 +1,18 @@
+\begin{lstlisting}[language=c++,caption={Obsługa wyjątków w Rust (ns\_test\_crasher.rs)}]
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn handle_exception(
+    _exinfo: *const EXCEPTION_POINTERS
+) -> i32 {
+    TerminateProcess(GetCurrentProcess(), 0);
+    0
+}
+
+#[cfg(target_os = "windows")]
+#[no_mangle]
+pub extern "C" fn TryOverrideExceptionHandler() {
+    unsafe {
+        SetUnhandledExceptionFilter(Some(handle_exception));
+    }
+}
+\end{lstlisting}
+

@@ -1,0 +1,17 @@
+\begin{lstlisting}[language=c++,caption={Zapisywanie pamięci aplikacji w Rust (ns\_test\_crasher.rs)}]
+#[no_mangle]
+pub extern "C" fn SaveAppMemory() -> u64 {
+    let mut test_data = Box::new([0u8; 32]);
+    for i in 0..32 {
+        test_data[i] = i as u8;
+    }
+    let leaked_ref: &'static mut [u8; 32] = Box::leak(test_data);
+    let addr = leaked_ref.as_ptr() as u64;
+
+    if let Ok(mut file) = fs::File::create("crash-addr") {
+        let _ = writeln!(file, "0x{:x}", addr);
+    }
+    addr
+}
+\end{lstlisting}
+

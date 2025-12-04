@@ -1,0 +1,19 @@
+\begin{lstlisting}[language=c++,caption={Alokacja PHC w Rust (ns\_test\_crasher.rs)}]
+#[cfg(feature = "moz_phc")]
+#[no_mangle]
+pub extern "C" fn GetPHCAllocation(size: usize) -> *mut u8 {
+    for _ in 0..2000000 {
+        unsafe {
+            let p = malloc(size) as *mut u8;
+            if !p.is_null() && 
+               Rust_IsPHCAllocation(p as *mut c_void, 
+                                    std::ptr::null_mut()) {
+                return p;
+            }
+            free(p as *mut c_void);
+        }
+    }
+    panic!("failed to get a PHC allocation");
+}
+\end{lstlisting}
+

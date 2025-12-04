@@ -1,0 +1,19 @@
+\begin{lstlisting}[language=c++,caption={Rozwiązywanie adresów funkcji CFI w Rust}]
+#[cfg(all(windows, target_arch = "x86_64"))]
+type CfiAsmFunc = unsafe extern "C" fn(u64, *mut c_void) -> u64;
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+unsafe fn resolve_cfi_func_addr(fnid: i16) -> u64 {
+    let target_func: CfiAsmFunc = match fnid {
+        CRASH_X64CFI_NO_MANS_LAND => x64CrashCFITest_NO_MANS_LAND,
+        CRASH_X64CFI_LAUNCHER => x64CrashCFITest_Launcher,
+        CRASH_X64CFI_UNKNOWN_OPCODE => x64CrashCFITest_UnknownOpcode,
+        // inne przypadki
+        _ => return 0,
+    };
+    // Adresy wskazuja na tablice skokow, nie na ciala funkcji.
+    // Pobranie poprawnego wskaznika przez wywolanie z returnpfn=1
+    target_func(1, std::ptr::null_mut())
+}
+\end{lstlisting}
+
