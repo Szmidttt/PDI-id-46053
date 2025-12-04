@@ -1,0 +1,13 @@
+\begin{lstlisting}[language=C++,caption={Obsługa wyjątków w C++ (nsTestCrasher.cpp)}]
+#ifdef XP_WIN
+static LONG WINAPI HandleException(EXCEPTION_POINTERS* exinfo) {
+  TerminateProcess(GetCurrentProcess(), 0);
+  return 0;
+}
+
+extern "C" NS_EXPORT void TryOverrideExceptionHandler() {
+  SetUnhandledExceptionFilter(HandleException);
+}
+#endif
+\end{lstlisting}
+

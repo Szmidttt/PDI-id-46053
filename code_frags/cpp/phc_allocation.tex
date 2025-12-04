@@ -1,0 +1,15 @@
+\begin{lstlisting}[language=C++,caption={Alokacja PHC w C++ (nsTestCrasher.cpp)}]
+#ifdef MOZ_PHC
+uint8_t* GetPHCAllocation(size_t aSize) {
+  for (int i = 0; i < 2000000; i++) {
+    uint8_t* p = (uint8_t*)malloc(aSize);
+    if (mozilla::phc::IsPHCAllocation(p, nullptr)) {
+      return p;
+    }
+    free(p);
+  }
+  MOZ_CRASH("failed to get a PHC allocation");
+}
+#endif
+\end{lstlisting}
+

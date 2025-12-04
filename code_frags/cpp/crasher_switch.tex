@@ -1,0 +1,23 @@
+\begin{lstlisting}[language=C++,caption={Dyspozycja awarii w C++ (nsTestCrasher.cpp)}]
+extern "C" NS_EXPORT void Crash(int16_t how) {
+  switch (how) {
+    case CRASH_INVALID_POINTER_DEREF: {
+      volatile int* foo = (int*)0x42;
+      *foo = 0;
+      break;
+    }
+    case CRASH_PURE_VIRTUAL_CALL: {
+      PureVirtualCall();
+      break;
+    }
+    case CRASH_OOM: {
+      [[maybe_unused]] void* r0 = moz_xmalloc((size_t)-1);
+      [[maybe_unused]] void* r1 = moz_xmalloc((size_t)-1);
+      [[maybe_unused]] void* r2 = moz_xmalloc((size_t)-1);
+      break;
+    }
+    // inne przypadki
+  }
+}
+\end{lstlisting}
+
