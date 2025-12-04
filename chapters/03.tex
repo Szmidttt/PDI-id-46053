@@ -96,7 +96,7 @@ Do przeprowadzenia migracji wybranego fragmentu kodu użyto następujących narz
         \item \textbf{Bugzilla:} System śledzenia błędów pełniący rolę głównego rejestru zadań (ang. \textit{issue tracker}) w organizacji Mozilla. Posłużył do znalezienia fragmentu kodu do migracji oraz analizy wymagań funkcjonalnych.
     \end{itemize}
 \end{itemize}
-\section{Migracja części odpowiedzialnej za anlizę zrzutów pamięci}
+\section{Migracja części odpowiedzialnej za analizę zrzutów pamięci}
 Proces migracji komponentu odpowiedzialnego za analizę zrzutów pamięci, zaimplementowanego pierwotnie w pliku dumputils.cpp, rozpoczęto od przygotowania środowiska deweloperskiego. Celem było umożliwienie kompilacji kodu Rust i jego integracji z istniejącą, opartą na C++, strukturą biblioteki testcrasher.
 \subsection{Przygotowanie środowiska}
 Integracja nowego kodu w języku Rust z rozbudowanym ekosystemem przeglądarki Firefox wymagała przeprowadzenia kilku operacji konfiguracyjnych w systemie budowania.
@@ -147,7 +147,7 @@ W funkcji DumpCheckMemory widoczna jest znacząca różnica w sposobie obsługi 
     \input{code_frags/rust/3.tex}
 \end{itemize}
 Podejście z C++ jest niskopoziomowe i podatne na błędy. Programista musi ręcznie zarządzać uchwytem do pliku (FILE*), pamiętając o jego zamknięciu (fclose) w każdej możliwej ścieżce wyjścia z funkcji. Biblioteka standardowa Rusta oferuje znacznie bezpieczniejsze abstrakcje. Funkcja fs::read\_to\_string w jednej operacji otwiera plik, odczytuje całą jego zawartość do String i automatycznie go zamyka, a wynik zwraca jako Result. Parsowanie jest również jawne i bezpieczne: u64::from\_str\_radix wymaga podania podstawy systemu liczbowego (tutaj 16) i również zwraca Result, co chroni przed niepoprawnym formatem danych w pliku. Takie podejście jest nie tylko bezpieczniejsze, ale również czytelniejsze.
-\subsection{Architektura po migracji modułu analityczneg}
+\subsection{Architektura po migracji modułu analitycznego}
 W tym kroku, po pomyślnej reimplementacji logiki analizy zrzutów pamięci, możliwe stało się całkowite wyeliminowanie zależności od biblioteki Google Breakpad oraz usunięcie pliku źródłowego dumputils.cpp. Funkcjonalność ta została w pełni przejęta przez kod w języku Rust. Uproszczoną strukturę biblioteki, pozbawioną już komponentów analitycznych napisanych w C++, przedstawiono na schemacie blokowym \ref{fig:testcrasher-architecture2}. Widać na nim, że plik moz.build nie odwołuje się już do źródeł Breakpada, a jedynie do biblioteki rust\_testcrasher oraz pozostawionego jeszcze pliku nsTestCrasher.cpp.
 \begin{figure}[H]
 \centering
@@ -197,7 +197,83 @@ Rezultatem wykonania komendy \texttt{bindgen} był plik bindings.rs, który zawi
 Należy jednak podkreślić, że plik ten nie zawierał faktycznej implementacji (ciał funkcji), a jedynie ich deklaracje zamknięte w blokach \texttt{extern "C"}. Z perspektywy języka Rust są to tzw. symbole zewnętrzne - obietnica, że kod maszynowy tych funkcji zostanie dostarczony później. Fizyczne powiązanie tych deklaracji z ich wykonawczymi odpowiednikami (zaimplementowanymi w wrapper.cpp) następuje dopiero w fazie linkowania. Wówczas linker łączy skompilowany kod Rusta ze skompilowanym obiektem C++, rozwiązując puste symbole i tworząc działającą bibliotekę.
 Wygenerowany fragment pliku bindings.rs przedstawiono na listingu poniżej:
 \input{code_frags/rust/bindings.tex}
-\subsection{Omówienie migracji części odpowiedzialnej za analizę w języku Rust}
+\subsection{Omówienie migracji części odpowiedzialnej za wywołanie awarii procesu w języku Rust}
+W niniejszym podrozdziale przedstawiono i przeanalizowano kluczowe zmiany wynikające z migracji logiki odpowiedzialnej za wywoływanie awarii procesu z pliku nsTestCrasher.cpp na język Rust. Migracja ta wymagała zastosowania innego podejścia niż w przypadku modułu analitycznego, ze względu na konieczność integracji z niskopoziomowymi mechanizmami systemu operacyjnego oraz specyficznymi konstrukcjami języka C++.
+\subsubsection{Struktura dyspozytora awarii}
+Główna funkcja \texttt{Crash()} pełni rolę dyspozytora, który na podstawie przekazanego argumentu wywołuje odpowiedni scenariusz błędu. Porównanie implementacji w obu językach ukazuje fundamentalne różnice w sposobie obsługi wielowariantowej logiki.
+\begin{itemize}
+    \item Kod w C++:
+    \input{code_frags/cpp/crasher_switch.tex}
+    \item Kod w Rust:
+    \input{code_frags/rust/crasher_match.tex}
+\end{itemize}
+W wersji C++ wykorzystano tradycyjną instrukcję \texttt{switch-case}, która wymaga jawnego użycia słowa kluczowego \texttt{break} po każdym przypadku. W języku Rust konstrukcja \texttt{match} jest wyrażeniem, które wymusza pełne pokrycie wszystkich możliwych wariantów. Kompilator zgłasza błąd, jeśli programista nie obsłuży wszystkich przypadków. Dodatkowo, każde ramię konstrukcji match jest izolowane i nie występuje problem przepływu, jak w przypadku C++ przy pominięciu \texttt{break}.
+Istotną różnicą jest również wykorzystanie biblioteki \texttt{sadness-generator} do implementacji standardowych scenariuszy awarii. Zamiast ręcznie konstruować wskaźniki jak w C++ (\texttt{volatile int* foo = (int*)0x42}), Rust wykorzystuje abstrakcję \texttt{SadnessFlavor::Segfault.make\_sad()}, która jest bezpieczniejsza i bardziej czytelna.
+\subsubsection{Zarządzanie pamięcią w funkcji SaveAppMemory}
+Funkcja \texttt{SaveAppMemory()} demonstruje fundamentalną różnicę w podejściu do zarządzania pamięcią między C++ a Rust. Jej zadaniem jest alokacja bufora, wypełnienie go danymi testowymi i zapisanie adresu do pliku.
+\begin{itemize}
+    \item Kod w C++:
+    \input{code_frags/cpp/save_app_memory.tex}
+    \item Kod w Rust:
+    \input{code_frags/rust/save_app_memory.tex}
+\end{itemize}
+W C++ bufor \texttt{testData} jest zmienną globalną o statycznym czasie życia, co oznacza że pamięć jest alokowana na etapie kompilacji i istnieje przez cały czas działania programu. Podejście to jest proste, ale wprowadza stan mutowalny, który może być źródłem błędów.
+
+Wersja w Rust wykorzystuje mechanizm \texttt{Box::leak()}, który celowo "wycieka" pamięć, tworząc referencję o statycznym czasie życia. Pamięć musi przetrwać do momentu awarii procesu, aby moduł Crashreporter mógł ją odczytać. Użycie \texttt{Box::leak()} jest jawną deklaracją, w przeciwieństwie do globalnego stanu w C++.
+w Rust nie ma zmiennych globalnych o statycznym czasie życia, które można mutować bezpiecznie (poza \texttt{static mut}, ale jest to niezalecane i niebezpieczne).
+Dodatkowo, zamiast C++ funkcji \texttt{fopen/fprintf/fclose} z ręcznym sprawdzaniem błędów, w języku Rust zastosowano \texttt{fs::File::create()} z konstrukcją \texttt{if let Ok(...)}, która obsługuje potencjalne błędy.
+\subsubsection{Kompilacja warunkowa i mechanizm PHC}
+Migracja kodu związanego z mechanizmem PHC wymagała zastosowania odpowiedników dyrektyw preprocesora C++ w języku Rust.
+\begin{itemize}
+    \item Kod w C++:
+    \input{code_frags/cpp/phc_allocation.tex}
+    \item Kod w Rust:
+    \input{code_frags/rust/phc_allocation.tex}
+\end{itemize}
+Kod Rust korzysta z funkcji biblioteki \texttt{libc} (\texttt{malloc} i \texttt{free}) zamiast bezpiecznych alokatorów Rust. Jest to konieczne, ponieważ mechanizm PHC wymaga bezpośredniego dostępu do alokacji pamięci w sposób, który może być monitorowany przez moduł PHC. Użycie standardowych abstrakcji Rust (np. \texttt{Vec} lub \texttt{Box}) uniemożliwiło poprawne działanie testów i wymagało dodatkowych zmian w całym projekcie, które nie wchodzą w zakres niniejszej pracy.
+\subsubsection{Integracja z Windows API}
+Obsługa niskopoziomowych mechanizmów systemu Windows, takich jak rejestracja niestandardowego filtru wyjątków, wymagała precyzyjnego odwzorowania API systemu operacyjnego.
+\begin{itemize}
+    \item Kod w C++:
+    \input{code_frags/cpp/exception_handler.tex}
+    \item Kod w Rust:
+    \input{code_frags/rust/exception_handler.tex}
+\end{itemize}
+W C++ integracja z Windows API jest bezpośrednia i wystarczy dołączyć odpowiedni nagłówek (\texttt{<windows.h>}), zatem wywołać funkcje systemowe. Konwencja wywołania (\texttt{WINAPI}) i typy (np. \texttt{LONG}, \texttt{EXCEPTION\_POINTERS*}) są natywnie obsługiwane.
+
+W Rust konieczne było użycie biblioteki \texttt{windows-sys}, która dostarcza niskopoziomowe wiązania do Windows API. Funkcja obsługująca wyjątki musi być oznaczona konwencją wywołania \texttt{extern "system"}, która na platformie Windows odpowiada konwencji \texttt{stdcall}. Atrybut \texttt{\#[cfg(target\_os = "windows")]} zapewnia, że kod jest kompilowany wyłącznie na platformie docelowej.
+\subsubsection{Obsługa testów CFI na architekturze x86\_64}
+Następnym wyzwaniem była migracja logiki odpowiedzialnej za testy CFI, które wymagają bezpośredniej interakcji z kodem asemblerowym.
+\input{code_frags/rust/cfi_resolve.tex}
+Funkcje testowe CFI są zaimplementowane w języku asemblera (plik \texttt{win64UnwindInfoTests.asm}) i nie podlegały migracji. Zadaniem kodu Rust było jedynie zapewnienie interfejsu do ich wywoływania. W tym celu zdefiniowano blok \texttt{extern "C"} z deklaracjami funkcji zewnętrznych oraz funkcję pomocniczą \texttt{resolve\_cfi\_func\_addr()}, która mapuje identyfikatory na wskaźniki do funkcji asemblerowych.
+
+Warto zwrócić uwagę na wyjaśniający komentarz w kodzie: funkcje asemblerowe zwracają adresy wskazujące na tablicę skoków, nie na właściwe ciała funkcji. Aby uzyskać poprawny wskaźnik, należy wywołać funkcję z argumentem \texttt{returnpfn=1}. Ten mechanizm został zachowany bez zmian z oryginalnej implementacji C++.
 \subsection{Architektura po migracji}
+Po zakończeniu procesu migracji obu modułów(analitycznego (dumputils.cpp) oraz odpowiedzialnego za wywoływanie awarii (nsTestCrasher.cpp)), architektura biblioteki testcrasher uległa znacznej zmianie. Całość logiki funkcjonalnej została przeniesiona do kodu napisanego w języku Rust, eliminując zależność od biblioteki Google Breakpad oraz znaczną część oryginalnego kodu C++.
+Mimo przeprowadzenia migracji, pewne elementy pozostały zaimplementowane w języku oryginalnym:
+\begin{itemize}
+    \item \textbf{wrapper.cpp} - warstwa pośrednicząca zapewniająca dostęp do mechanizmów niedostępnych bezpośrednio w języku Rust (makro \texttt{MOZ\_CRASH()}, funkcje PHC, alokator \texttt{moz\_xmalloc}).
+    \item \textbf{ExceptionThrower.cpp} - kod odpowiedzialny za generowanie wyjątków C++, które nie mogą być w pełni odwzorowane w Rust.
+    \item \textbf{win64UnwindInfoTests.asm} - kod asemblerowy testów CFI.
+\end{itemize}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/testcrasher3.png}
+    \caption{Architektura biblioteki testcrasher - Etap 3 - opracowanie własne}
+    \label{fig:testcrasher-architecture-final}
+\end{figure}
+Końcowa architektura charakteryzuje się następująco:
+\begin{enumerate}
+    \item \textbf{Warstwa API (Rust):} Funkcje eksportowane (\texttt{Crash()}, \texttt{SaveAppMemory()}, \texttt{DumpHasStream()} itd.) są zaimplementowane w Rust i stanowią publiczny interfejs biblioteki.
+    \item \textbf{Warstwa pośrednicząca (C++):} Plik \texttt{wrapper.cpp} dostarcza funkcje pomocnicze (\texttt{Rust\_moz\_xmalloc()}, \texttt{Rust\_MOZ\_CRASH()}) wywoływane z kodu Rust poprzez FFI.
+    \item \textbf{Zależności zewnętrzne:} Biblioteka \texttt{rust-minidump} zastąpiła Google Breakpad do analizy plików zrzutu pamięci, a \texttt{sadness-generator} dostarcza implementacje standardowych scenariuszy awarii.
+\end{enumerate}
 
+\subsubsection{Proces budowania}
+Proces budowania biblioteki został rozszerzony o etap kompilacji kodu Rust:
+\begin{enumerate}
+    \item \textbf{Kompilacja Rust:} System budowania Mozilla (\texttt{mach}) wywołuje Cargo, który kompiluje kod źródłowy Rust do biblioteki statycznej \texttt{rust\_testcrasher.lib}.
+    \item \textbf{Kompilacja C++:} Pliki \texttt{wrapper.cpp}, \texttt{ExceptionThrower.cpp} oraz opcjonalnie \texttt{win64UnwindInfoTests.asm} są kompilowane do obiektów.
+    \item \textbf{Linkowanie:} Wszystkie komponenty są łączone w finalną bibliotekę dynamiczną \texttt{testcrasher.dll}. Symbole zdefiniowane w pliku \texttt{testcrasher.def} są eksportowane jako API.
+\end{enumerate}
