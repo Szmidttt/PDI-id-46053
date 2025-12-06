@@ -5,14 +5,14 @@ Podczas wyboru fragmentu kodu kierowaliśmy się kilkoma kluczowymi kryteriami:
 \begin{itemize}
     \item \textbf{Wysoki potencjał poprawy bezpieczeństwa:}
     \begin {itemize}
-        \item \textbf{Zarządznie pamięcią:} Kandydat do migracji powinien operować w obszarze, w którym błędy zarządzania pamięcią, typowe dla języka C++, mogą prowadzić do poważnych luk w zabezpieczeniach. Przykładem może być praca z surowymi danymi, takimi jak zrzuty pamięci.
+        \item \textbf{Zarządzanie pamięcią:} Kandydat do migracji powinien operować w obszarze, w którym błędy zarządzania pamięcią, typowe dla języka C++, mogą prowadzić do poważnych luk w zabezpieczeniach. Przykładem może być praca z surowymi danymi, takimi jak zrzuty pamięci.
         \item \textbf{Zastąpienie przestarzałej zależności:} Komponent opiera się na zewnętrznej bibliotece C++, uznawanej za przestarzałą lub posiadającej nowocześniejszy i bezpieczniejszy odpowiednik w języku Rust.
     \end{itemize}
         \item \textbf{Wykonalność i modularność:} Fragment kodu musiał być na tyle odizolowany, aby jego migracja nie pociągała za sobą konieczności przepisywania znacznych części przeglądarki. Biblioteka o jasno zdefiniowanym API i konkretnym zadaniu ułatwia proces zastępowania implementacji bez naruszania reszty systemu.
-        \item \textbf{Zgodność ze strategicznymi celami Fundacji Mozilla:} Wybrany komponent powinien wpisywać się w długofalową strategię Mozilli polegającą na stopniowym zwiększaniu ilości kodu napisanego w Rust w celu poprawy bezpieczeństwa i wydajności przeglądarki. Zgodnie z incjatywą "Oxidation". \cite{oxidation}
+        \item \textbf{Zgodność ze strategicznymi celami Fundacji Mozilla:} Wybrany komponent powinien wpisywać się w długofalową strategię Mozilli polegającą na stopniowym zwiększaniu ilości kodu napisanego w Rust w celu poprawy bezpieczeństwa i wydajności przeglądarki. Zgodnie z inicjatywą "Oxidation". \cite{oxidation}
     \end{itemize}
 \section{Wybrany fragment kodu - biblioteka dynamiczna testcrasher}
-Pierwszym etapem prac było zidentyfikowanie w kodzie źródłowym należącym do fundacji Mozilla odpowiedniego kandydata do migracji, który spełniałby wcześniej zdefiniowane kryteria. W procesie tym wykorzystano dwa narzędzia. Pierwszym z nich był Searchfox, narzędzie które indeksuje kod źródłowy oraz umożliwia szybkie wyszukiwanie kodu i plików źródłowych. Drugim narzędziem była Bugzilla, system śledzenia zadań Mozilli, służący do zarządzania zgłoszeniami błędów, propozycjami zmian i zadaniami deweloperskimi.
+Pierwszym etapem prac było zidentyfikowanie w kodzie źródłowym należącym do fundacji Mozilla odpowiedniego kandydata do migracji, który spełniałby wcześniej zdefiniowane kryteria. W procesie tym wykorzystano dwa narzędzia. Pierwszym z nich był Searchfox\cite{searchfox}, narzędzie które indeksuje kod źródłowy oraz umożliwia szybkie wyszukiwanie kodu i plików źródłowych. Drugim narzędziem była Bugzilla, system śledzenia zadań Mozilli, służący do zarządzania zgłoszeniami błędów, propozycjami zmian i zadaniami deweloperskimi.
 Przy użyciu tych narzędzi oraz na podstawie powyżej opisanych kryteriów do migracji została wybrana wewnętrzna biblioteka testcrasher.dll. Na decyzję dodatkowo wpłynął fakt istnienia w systemie śledzenia błędów Mozilli zadania o numerze Bug 1798688\cite{bug1798688}, które jawnie definiuje cel jako "Replace breakpad with rust-minidump in the testcrasher library" \footnote{Zastąpienie breakpad przez rust-minidump w blibliotece testcrasher}.
 \subsection{Cel biblioteki testcrasher}
 Biblioteka dynamiczna testcrasher jest narzędziem deweloperskim które używane jest jako tester działania komponentu Crashreporter - wewnętrznego mechanizmu przeglądarki Firefox, odpowiedzialnego za zbieranie i raportowanie informacji o awariach aplikacji.
@@ -42,7 +42,7 @@ Kod źródłowy biblioteki korzysta w niewielkim stopniu z kluczowych mechanizm�
 \\
 System budowania Mozilli, w przypadku biblioteki testcrasher stosuje metodę gdzie pliki .cpp są łączone w jedną jednostkę kompilacji w celu przyspieszenia procesu. Następnie skompilowany kod obiektowy jest linkowany w ostateczną bibliotekę dynamiczną testcrasher.dll.
 \\
-Głównym sposobem użycia biblioteki sa zautomatyzowane testy, najczęściej pisane w JavaScripcie i uruchamiane w specjalnym frameworku testowym Mozilli. Skrypt testowy wywołuje wyeksportowaną funkcję z testcrasher.dll w celu spowodowania awarii i sprawdzenia czy moduł Crash Reporter wygenerował poprawny plik zrzutu pamięci.
+Głównym sposobem użycia biblioteki są zautomatyzowane testy, najczęściej pisane w JavaScripcie i uruchamiane w specjalnym frameworku testowym Mozilli. Skrypt testowy wywołuje wyeksportowaną funkcję z testcrasher.dll w celu spowodowania awarii i sprawdzenia czy moduł Crash Reporter wygenerował poprawny plik zrzutu pamięci.
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.8\linewidth]{figures/testcrasher.png}
@@ -77,7 +77,7 @@ Do przeprowadzenia migracji wybranego fragmentu kodu użyto następujących narz
     \item \textbf{Środowisko i system budowania:}
     \begin{itemize}
         \item \textbf{mach:} Narzędzie wiersza poleceń (CLI) stworzone przez fundacje Mozilla w celu wspomagania rozwoju przeglądarki Firefox, zaimplementowane w języku Python. Pełni ono funkcję generycznego dyspozytora poleceń. W pracy głównym użyciem było uruchamianie budowania biblioteki oraz uruchamiane testów.
-        \item \textbf{WSL (Windows Subsystem for Linux):} Wirtualne środowisko wykorzystane pomocniczo do procesu vendorowania bibliotek Rust. Jego użycie było konieczne z powodu na niestabliność mechanizmu pobierania zależności na Windowsie.
+        \item \textbf{WSL (Windows Subsystem for Linux):} Wirtualne środowisko wykorzystane pomocniczo do procesu vendorowania bibliotek Rust. Jego użycie było konieczne z powodu na niestabilność mechanizmu pobierania zależności na Windowsie.
     \end{itemize}
     \item \textbf{Narzędzia umożliwiajęce interoperacyjność:}
     \begin{itemize}
